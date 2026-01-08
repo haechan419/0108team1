@@ -3,6 +3,7 @@ package com.Team1_Back.repository;
 import com.Team1_Back.domain.ChatMessage;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -32,4 +33,18 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
           AND m.deleted_at IS NULL
         """, nativeQuery = true)
     Optional<Long> findLatestMessageId(Long roomId);
+
+    List<ChatMessage> findTop80ByRoomIdOrderByCreatedAtDesc(Long roomId);
+
+    @Query(value = """
+        SELECT m.*
+        FROM chat_message m
+        JOIN chat_room_member crm
+          ON crm.room_id = m.room_id
+        WHERE crm.user_id = :meId
+        ORDER BY m.created_at DESC
+        LIMIT :limit
+        """, nativeQuery = true)
+    List<ChatMessage> findRecentMessagesForUser(@Param("meId") Long meId, @Param("limit") int limit);
+
 }

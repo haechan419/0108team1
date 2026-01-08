@@ -1,15 +1,14 @@
 import axios from "axios";
-import {getCookie, setCookie, removeCookie} from "./cookieUtil";
-import {getAccessToken} from "../util/authToken"; // ✅ 추가
+import { getCookie, setCookie, removeCookie } from "./cookieUtil";
 
 // API 서버 주소
 export const API_SERVER_HOST = "http://localhost:8080";
 
-// JWT용 axios 인스턴스 생성
+// JWT용 axios 인스턴스 생성 (axiosInstance 기능 통합)
 const jwtAxios = axios.create({
     baseURL: process.env.REACT_APP_API_BASE_URL || "http://localhost:8080/api",
     timeout: 10000,
-    headers: {"Content-Type": "application/json"},
+    headers: { "Content-Type": "application/json" },
     withCredentials: false,
 });
 
@@ -18,16 +17,11 @@ const isAuthEndpoint = (url = "") => {
     return url.startsWith("/auth/");
 };
 
-// ✅ WS에서도 똑같이 쓰도록 export
-export function getAuthTokenForRequest() {
-    return getAccessToken();
-}
-
 /**
  * Refresh Token으로 새 Access Token 발급 요청
  */
 const refreshJWT = async (accessToken, refreshToken) => {
-    const header = {headers: {Authorization: `Bearer ${accessToken}`}};
+    const header = { headers: { Authorization: `Bearer ${accessToken}` } };
 
     const res = await axios.get(
         `${API_SERVER_HOST}/api/auth/refresh?refreshToken=${refreshToken}`,
@@ -58,7 +52,7 @@ const beforeReq = (config) => {
             console.log("로그인 정보 없음");
             return Promise.reject({
                 response: {
-                    data: {error: "REQUIRE_LOGIN"},
+                    data: { error: "REQUIRE_LOGIN" },
                 },
             });
         }
@@ -86,7 +80,7 @@ const beforeReq = (config) => {
  * 요청 실패 인터셉터
  */
 const requestFail = (err) => {
-    console.log("--- jwtAxios 요청 에러 ---", err);
+    console.log("--- jwtAxios 요청 에러 ---");
     return Promise.reject(err);
 };
 
@@ -101,7 +95,41 @@ const beforeRes = async (res) => {
     // 서버가 "message": "ERROR_ACCESS_TOKEN" 형식으로 반환하므로 확인
     if (data && (data.error === "ERROR_ACCESS_TOKEN" || data.message === "ERROR_ACCESS_TOKEN")) {
         console.log("[JWT] Access Token 만료 - 갱신 시도");
-        return await handleTokenRefresh(res.config);
+
+        const memberCookieValue = getCookie("member");
+
+        if (!memberCookieValue || !memberCookieValue.refreshToken) {
+            console.log("[JWT] Refresh Token 없음 - 로그아웃 처리");
+            return Promise.reject({
+                response: {
+                    data: { error: "REQUIRE_LOGIN" },
+                },
+            });
+        }
+
+        try {
+            // Refresh Token으로 새 토큰 발급
+            const result = await refreshJWT(
+                memberCookieValue.accessToken,
+                memberCookieValue.refreshToken
+            );
+
+            console.log("[JWT] 새 토큰 발급 완료");
+
+            // 쿠키에 새 토큰 저장
+            memberCookieValue.accessToken = result.accessToken;
+            memberCookieValue.refreshToken = result.refreshToken;
+            setCookie("member", memberCookieValue, 1);
+
+            // 원래 요청 재시도
+            const originalRequest = res.config;
+            originalRequest.headers.Authorization = `Bearer ${result.accessToken}`;
+
+            return await jwtAxios(originalRequest);
+        } catch (error) {
+            console.error("[JWT] 토큰 갱신 실패:", error);
+            return Promise.reject(error);
+        }
     }
 
     return res;
@@ -126,69 +154,57 @@ const responseFail = async (err) => {
     // ✅ 401 에러이고 ERROR_ACCESS_TOKEN 메시지인 경우 토큰 갱신 시도
     if (status === 401 && (errorData?.message === "ERROR_ACCESS_TOKEN" || errorData?.error === "ERROR_ACCESS_TOKEN")) {
         console.log("[JWT] 401 ERROR_ACCESS_TOKEN - 토큰 갱신 시도");
-        return await handleTokenRefresh(err.config);
+
+        const memberCookieValue = getCookie("member");
+
+        if (!memberCookieValue || !memberCookieValue.refreshToken) {
+            console.log("[JWT] Refresh Token 없음 - 로그아웃 처리");
+            return Promise.reject({
+                response: {
+                    data: { error: "REQUIRE_LOGIN" },
+                },
+            });
+        }
+
+        try {
+            // Refresh Token으로 새 토큰 발급
+            const result = await refreshJWT(
+                memberCookieValue.accessToken,
+                memberCookieValue.refreshToken
+            );
+
+            console.log("[JWT] 새 토큰 발급 완료");
+
+            // 쿠키에 새 토큰 저장
+            memberCookieValue.accessToken = result.accessToken;
+            memberCookieValue.refreshToken = result.refreshToken;
+            setCookie("member", memberCookieValue, 1);
+
+            // 원래 요청 재시도
+            const originalRequest = err.config;
+            originalRequest.headers.Authorization = `Bearer ${result.accessToken}`;
+
+            return await jwtAxios(originalRequest);
+        } catch (error) {
+            console.error("[JWT] 토큰 갱신 실패:", error);
+            // 토큰 갱신 실패 시 기존 화면에 유지
+            return Promise.reject(error);
+        }
     }
-    // 권한 없음 처리(403)
-    if (status === 403) {
-        console.warn("권한이 없습니다:", errorData);
+
+    // 401 에러 시 로그아웃 처리 (토큰 갱신이 실패한 경우)
+    if (status === 401) {
+        console.log("[JWT] 401 에러 - 로그아웃 처리");
+        // 기존 코드: 쿠키 삭제 및 로그인 화면으로 이동
+        // removeCookie("member");
+        // window.location.href = "/";
+        // 401 에러 발생 시 기존 화면에 유지
+    } else if (status === 403) {
+        console.warn("권한이 없습니다:", err.response?.data);
     }
-    // 토큰 갱신 실패 시 기존 화면에 유지
+
     return Promise.reject(err);
-}
-
-// 공통 토큰 갱신 처리 함수 (내부 사용)
-async function handleTokenRefresh(originalConfig) {
-    const memberCookieValue = getCookie("member");
-
-    if (!memberCookieValue || !memberCookieValue.refreshToken) {
-        console.log("[JWT] Refresh Token 없음 - 로그아웃 처리");
-        // 에러 발생 시 삭제 한해찬!!!
-        removeCookie("member"); // 필요 시 쿠키 삭제
-
-        return Promise.reject({
-            response: {
-                data: {error: "REQUIRE_LOGIN"},
-            },
-        });
-    }
-
-    try {
-        // Refresh Token으로 새 토큰 발급
-        const result = await refreshJWT(
-            memberCookieValue.accessToken,
-            memberCookieValue.refreshToken
-        );
-
-        console.log("[JWT] 새 토큰 발급 완료");
-
-        // 쿠키에 새 토큰 저장
-        memberCookieValue.accessToken = result.accessToken;
-        memberCookieValue.refreshToken = result.refreshToken;
-        setCookie("member", memberCookieValue, 1);
-
-        originalConfig.headers.Authorization = `Bearer ${result.accessToken}`;
-
-        return await jwtAxios(originalConfig);
-    } catch (error) {
-        console.error("[JWT] 토큰 갱신 실패:", error);
-        return Promise.reject(error);
-    }
-}
-
-// // 401 에러 시 로그아웃 처리 (토큰 갱신이 실패한 경우)
-// if (status === 401) {
-//     console.log("[JWT] 401 에러 - 로그아웃 처리");
-//     // 기존 코드: 쿠키 삭제 및 로그인 화면으로 이동
-//     // removeCookie("member");
-//     // window.location.href = "/";
-//     // 401 에러 발생 시 기존 화면에 유지
-// } else if (status === 403) {
-//     console.warn("권한이 없습니다:", err.response?.data);
-// }
-
-// return Promise.reject(err);
-// }
-// ;
+};
 
 // 인터셉터 등록
 jwtAxios.interceptors.request.use(beforeReq, requestFail);

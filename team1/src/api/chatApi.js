@@ -1,23 +1,22 @@
-import jwtAxios from "../util/jwtUtil";
-
+import axiosInstance from "./axiosInstance";
 
 export const chatApi = {
     // --- user search / create rooms ---
     searchUsers: (q, limit = 20) =>
-        jwtAxios.get("/chat/users/search", { params: { q, limit } }).then(r => r.data),
+        axiosInstance.get("/chat/users/search", { params: { q, limit } }).then(r => r.data),
 
     createDm: (targetUserId) =>
-        jwtAxios.post("/chat/rooms/dm", { targetUserId }).then(r => r.data),
+        axiosInstance.post("/chat/rooms/dm", { targetUserId }).then(r => r.data),
 
     createGroup: (memberUserIds) =>
-        jwtAxios.post("/chat/rooms/group", { memberUserIds }).then(r => r.data),
+        axiosInstance.post("/chat/rooms/group", { memberUserIds }).then(r => r.data),
 
     invite: (roomId, userIds) =>
-        jwtAxios.post(`/chat/rooms/${roomId}/invite`, { userIds }).then(r => r.data),
+        axiosInstance.post(`/chat/rooms/${roomId}/invite`, { userIds }).then(r => r.data),
 
     // --- rooms / messages ---
     getRooms: async () => {
-        const res = await jwtAxios.get("/chat/rooms");
+        const res = await axiosInstance.get("/chat/rooms");
         return res.data;
     },
 
@@ -25,28 +24,48 @@ export const chatApi = {
         const params = {};
         if (cursor) params.cursor = cursor;
         if (limit) params.limit = limit;
-        const res = await jwtAxios.get(`/chat/rooms/${roomId}/messages`, { params });
+        const res = await axiosInstance.get(`/chat/rooms/${roomId}/messages`, { params });
         return res.data;
     },
 
     sendMessage: async (roomId, content) => {
-        const res = await jwtAxios.post(`/chat/rooms/${roomId}/messages`, { content });
+        const res = await axiosInstance.post(`/chat/rooms/${roomId}/messages`, { content });
         return res.data;
     },
 
     updateRead: async (roomId, lastReadMessageId = null) => {
-        const res = await jwtAxios.post(`/chat/rooms/${roomId}/read`, { lastReadMessageId });
+        const res = await axiosInstance.post(`/chat/rooms/${roomId}/read`, { lastReadMessageId });
         return res.data;
     },
 
     getRoomMeta: async (roomId) => {
-        const res = await jwtAxios.get(`/chat/rooms/${roomId}/meta`);
+        const res = await axiosInstance.get(`/chat/rooms/${roomId}/meta`);
         return res.data;
     },
 
     deleteRoom: async (roomId) => {
-        const res = await jwtAxios.delete(`/chat/rooms/${roomId}`);
+        const res = await axiosInstance.delete(`/chat/rooms/${roomId}`);
         return res.data;
     },
 
+    uploadAttachments: async (roomId, content, files) => {
+        const form = new FormData();
+        if (content != null) form.append("content", content); // "" 가능
+
+        if (files && files.length) {
+            for (const f of files) form.append("files", f);
+        }
+
+        const res = await axiosInstance.post(
+            `/chat/rooms/${roomId}/attachments`,
+            form,
+            {
+                headers: { "Content-Type": "multipart/form-data" },
+            }
+        );
+        return res.data; // { ok, messageId, attachments }
+    },
 };
+
+
+

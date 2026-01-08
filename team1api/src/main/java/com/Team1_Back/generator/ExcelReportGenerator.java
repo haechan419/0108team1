@@ -8,24 +8,14 @@ import org.springframework.stereotype.Component;
 
 import java.io.FileOutputStream;
 import java.nio.file.Path;
-
 @Component
 public class ExcelReportGenerator {
-
-    private String displayScope(DataScope scope) {
-        if (scope == null) return "";
-        return switch (scope) {
-            case MY -> "My Data";
-            case DEPT -> "Department";
-            case ALL -> "All";
-        };
-    }
 
     public void generate(Path outputFile, ReportJob job) throws Exception {
         try (Workbook wb = new XSSFWorkbook()) {
             Sheet sheet = wb.createSheet("Report");
 
-            // 헤더 스타일(선택, 최소한만)
+            // 헤더 스타일
             CellStyle headerStyle = wb.createCellStyle();
             Font headerFont = wb.createFont();
             headerFont.setBold(true);
@@ -41,20 +31,26 @@ public class ExcelReportGenerator {
             h1.setCellStyle(headerStyle);
 
             int row = 1;
+
             row = kv(sheet, row, "Report Type", job.getReportTypeId());
+            row = kv(sheet, row, "Report ID", String.valueOf(job.getId()));
             row = kv(sheet, row, "Period", job.getPeriod());
-            row = kv(sheet, row, "Scope", displayScope(job.getDataScope()));
+
+            // ✅ 여기 핵심
+            row = kv(sheet, row, "Scope", displayScopeWithDept(job));
+
             row = kv(sheet, row, "Category", job.getCategoryJson());
             row = kv(sheet, row, "Requested By", String.valueOf(job.getRequestedBy()));
+
+            // snapshot은 남겨도 되고, 싫으면 제거 가능
             row = kv(sheet, row, "Dept (snapshot)", job.getDepartmentSnapshot());
 
-            // ✅ A안: ReportService에서 계산해 주입한 값 사용
-            long records = (job.getApprovedCount() == null) ? 0L : job.getApprovedCount().longValue();
-            long total = (job.getApprovedTotal() == null) ? 0L : job.getApprovedTotal();
+            // 승인 집계
+            long approvedCount = job.getApprovedCount() == null ? 0 : job.getApprovedCount();
+            long approvedTotal = job.getApprovedTotal() == null ? 0 : job.getApprovedTotal();
 
-            row = kv(sheet, row, "Records Included", String.valueOf(job.getApprovedCount() == null ? 0 : job.getApprovedCount()));
-            row = kv(sheet, row, "Total Amount (KRW)", String.valueOf(job.getApprovedTotal() == null ? 0 : job.getApprovedTotal()));
-
+            row = kv(sheet, row, "Records Included", formatNumber(approvedCount));
+            row = kv(sheet, row, "Total Amount (KRW)", formatNumber(approvedTotal));
 
             sheet.autoSizeColumn(0);
             sheet.autoSizeColumn(1);
@@ -70,6 +66,24 @@ public class ExcelReportGenerator {
         r.createCell(0).setCellValue(key);
         r.createCell(1).setCellValue((value == null || value.isBlank()) ? "-" : value);
         return rowIdx + 1;
+    }
+
+    /**
+     * Scope 표시: Department - 개발2팀
+     */
+    private String displayScopeWithDept(ReportJob job) {
+        if (job.getDataScope() == null) return "";
+
+        return switch (job.getDataScope()) {
+            case MY -> "My Data";
+            case ALL -> "All";
+            case DEPT -> {
+                String dept = job.getDepartmentSnapshot();
+                yield (dept == null || dept.isBlank())
+                        ? "Department"
+                        : "Department - " + dept;
+            }
+        };
     }
 
     private String formatNumber(long n) {

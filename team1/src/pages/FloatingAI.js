@@ -1,537 +1,332 @@
 import { useEffect, useRef, useState } from "react";
 import "../styles/floatingai.css";
-import { useFloatingAI } from "../context/FloatingAIContext";
+import { getAuthTokenForRequest } from "../api/axiosInstance"; // ✅ src/pages 기준
 
-// ========================================
-// API 함수들
-// ========================================
+const API_BASE = "http://localhost:8080/api/ai";
 
-/**
- * 기존 일반 AI 생성 (Spring Boot → Ollama)
- */
-async function aiGenerate(prompt) {
-  const res = await fetch("http://localhost:8080/api/ai/generate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
-  });
+// --- 공통 fetch helper (JWT 포함) ---
+async function postJson(url, body) {
+    const token = getAuthTokenForRequest();
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`AI API failed: ${res.status} ${text}`);
-  }
-
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.message || "AI API returned ok=false");
-  return { type: "text", result: data.result };
-}
-
-/**
- * 출결 AI 요청 (Python FastAPI 서버)
- */
-async function attendanceAiRequest(prompt) {
-  const res = await fetch("http://localhost:8000/api/ai/attendance", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`출결 AI API failed: ${res.status} ${text}`);
-  }
-
-  const data = await res.json();
-  return data;
-}
-
-/**
- * 부서 실적 AI 요청 (Python FastAPI 서버)
- */
-async function performanceAiRequest(prompt) {
-  const res = await fetch("http://localhost:8000/api/ai/performance", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`실적 AI API failed: ${res.status} ${text}`);
-  }
-
-  const data = await res.json();
-  return data;
-}
-
-/**
- * 출결 관련 키워드 체크
- * 이 키워드가 포함되면 Python 서버로 요청
- */
-function isAttendanceQuery(prompt) {
-  const keywords = [
-    "출결",
-    "출근",
-    "지각",
-    "결근",
-    "휴가",
-    "근태",
-    "출석",
-    "attendance",
-  ];
-  const lowerPrompt = prompt.toLowerCase();
-  return keywords.some((keyword) => lowerPrompt.includes(keyword));
-}
-
-/**
- * 부서 실적 관련 키워드 체크
- */
-function isPerformanceQuery(prompt) {
-  const keywords = [
-    "실적",
-    "매출",
-    "비교",
-    "그래프",
-    "차트",
-    "성과",
-    "목표달성",
-    "계약",
-    "달성률",
-    "잘하는",
-    "순위",
-    "1위",
-    "최고",
-    "제일",
-    "부서",
-    "팀",
-    "작년",
-    "전년",
-    "성장",
-    "추이",
-    "분석",
-  ];
-  const lowerPrompt = prompt.toLowerCase();
-  return keywords.some((keyword) => lowerPrompt.includes(keyword));
-}
-
-// ========================================
-// 메인 컴포넌트
-// ========================================
-export default function FloatingAI() {
-  const { open, setOpen } = useFloatingAI();
-  const [prompt, setPrompt] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
-  const textareaRef = useRef(null);
-  const [imageModal, setImageModal] = useState(false); // 이미지 확대 모달
-
-  // 응답 상태 (확장됨)
-  const [response, setResponse] = useState({
-    message: "",
-    summary: "",
-    hasFile: false,
-    downloadUrl: "",
-    fileName: "",
-    chartImage: "", // Base64 그래프 이미지
-  });
-
-  // ====== 위치(드래그) 관련 ======
-  // 드래그 관련 상태 제거 (Topbar 고정 버튼 사용)
-
-  // ====== UX: 열릴 때 포커스 ======
-  useEffect(() => {
-    if (open) {
-      const t = setTimeout(() => textareaRef.current?.focus(), 50);
-      return () => clearTimeout(t);
-    }
-  }, [open]);
-
-  // ====== UX: ESC로 닫기 ======
-  useEffect(() => {
-    const onKeyDown = (e) => {
-      if (e.key === "Escape") {
-        // 이미지 모달이 열려있으면 이미지 모달 먼저 닫기
-        if (imageModal) {
-          setImageModal(false);
-        } else {
-          setOpen(false);
-        }
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [imageModal]);
-
-  // 위치/드래그 로직 제거 (Topbar 고정 버튼 사용)
-
-  // ====== AI 실행 (핵심 로직) ======
-  const onRun = async () => {
-    const p = prompt.trim();
-    if (!p) return;
-
-    setErr("");
-    setLoading(true);
-    setResponse({
-      message: "",
-      summary: "",
-      hasFile: false,
-      downloadUrl: "",
-      fileName: "",
-      chartImage: "",
+    const res = await fetch(url, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
     });
 
-    try {
-      // 부서 실적 관련 질문인지 확인 (우선 체크)
-      if (isPerformanceQuery(p)) {
-        // ★ Python 부서 실적 AI 서버 호출
-        console.log("[AI] 실적 관련 질문 → Python 서버로 요청");
-        const data = await performanceAiRequest(p);
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`AI API failed: ${res.status} ${text}`);
+    }
+    return await res.json();
+}
 
-        if (data.ok) {
-          setResponse({
-            message: data.message || "",
-            summary: data.summary || "",
-            hasFile: false,
-            downloadUrl: "",
-            fileName: "",
-            chartImage: data.chartImage || "",
-          });
-        } else {
-          setErr(data.message || "처리 실패");
-        }
-      }
-      // 출결 관련 질문인지 확인
-      else if (isAttendanceQuery(p)) {
-        // ★ Python 출결 AI 서버 호출
-        console.log("[AI] 출결 관련 질문 → Python 서버로 요청");
-        const data = await attendanceAiRequest(p);
+// --- 기존 generate ---
+async function aiGenerate(prompt) {
+    return postJson(`${API_BASE}/generate`, { prompt });
+}
 
-        if (data.ok) {
-          setResponse({
-            message: data.message || "",
-            summary: data.summary || "",
-            hasFile: data.hasFile || false,
-            downloadUrl: data.downloadUrl || "",
-            fileName: data.fileName || "",
-            chartImage: "",
-          });
-        } else {
-          setErr(data.message || "처리 실패");
-        }
-      } else {
-        // ★ 일반 AI 질문 (기존 Spring Boot → Ollama)
-        console.log("[AI] 일반 질문 → Spring Boot로 요청");
-        const finalPrompt = `한국어로만 답변해줘.\n\n${p}`;
-        const result = await aiGenerate(finalPrompt);
-        setResponse({
-          message: result.result,
-          summary: "",
-          hasFile: false,
-          downloadUrl: "",
-          fileName: "",
-          chartImage: "",
+// --- room 전용 ---
+async function aiFindContext(roomId, query) {
+    return postJson(`${API_BASE}/find-context`, { roomId, query });
+}
+
+// --- global (내 전체 채팅방) ---
+async function aiFindContextGlobal(query) {
+    return postJson(`${API_BASE}/find-context-global`, { query });
+}
+
+// 결과 포맷팅
+function formatContextResult(data) {
+    const summary = (data?.summary ?? "").toString().trim();
+    const msgs = Array.isArray(data?.messages) ? data.messages : [];
+
+    const lines = [];
+    lines.push(`📌 요약\n${summary || "(요약 없음)"}`);
+
+    if (msgs.length) {
+        lines.push("");
+        lines.push(`🧾 근거 메시지 (${Math.min(5, msgs.length)}개)`);
+        msgs.slice(0, 5).forEach((m) => {
+            const roomId = m.roomId != null ? `room:${m.roomId}` : "room:?";
+            const when = m.createdAt ? String(m.createdAt) : "";
+            const content = (m.content ?? "").toString();
+            lines.push(`- [${roomId}] ${when}  ${content}`);
         });
-      }
-    } catch (e) {
-      setErr(e?.message || String(e));
-    } finally {
-      setLoading(false);
+    } else {
+        lines.push("");
+        lines.push("🧾 근거 메시지: 없음");
     }
-  };
 
-  // ====== 엑셀 다운로드 ======
-  const handleDownload = async () => {
-    if (!response.downloadUrl) return;
+    return { text: lines.join("\n"), messages: msgs };
+}
 
-    try {
-      // Python 서버에서 파일 다운로드
-      const downloadUrl = `http://localhost:8000${response.downloadUrl}`;
+export default function FloatingAI({ roomId, onOpenRoom }) {
+    const [open, setOpen] = useState(false);
+    const [prompt, setPrompt] = useState("");
+    const [result, setResult] = useState("");
+    const [resultMessages, setResultMessages] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [err, setErr] = useState("");
+    const textareaRef = useRef(null);
 
-      const res = await fetch(downloadUrl);
-      if (!res.ok) throw new Error("다운로드 실패");
+    // ====== 위치(드래그) 관련 ======
+    const FAB_SIZE = 58;
+    const MARGIN = 12;
 
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = response.fileName || "출결데이터.xlsx";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (e) {
-      setErr("파일 다운로드 실패: " + e.message);
+    function clampPos(p) {
+        const maxX = window.innerWidth - MARGIN - FAB_SIZE;
+        const maxY = window.innerHeight - MARGIN - FAB_SIZE;
+        return {
+            x: Math.max(MARGIN, Math.min(p.x, maxX)),
+            y: Math.max(MARGIN, Math.min(p.y, maxY)),
+        };
     }
-  };
 
-  // ====== Enter 키로 전송 ======
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      onRun();
-    }
-  };
+    const [pos, setPos] = useState(() => {
+        const saved = localStorage.getItem("floatingAI.pos");
+        const initial = saved
+            ? JSON.parse(saved)
+            : { x: 18, y: window.innerHeight - 18 - FAB_SIZE };
+        return clampPos(initial);
+    });
 
-  return (
-    <>
-      {/* 오버레이 + 패널 */}
-      {open && (
-        <div className="ai-overlay" onMouseDown={() => setOpen(false)}>
-          <div
-            className="ai-panel"
-            onMouseDown={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-          >
-            <div className="ai-panel__header">
-              <div className="ai-panel__title">🤖 AI Assistant</div>
-              <button className="ai-x" onClick={() => setOpen(false)}>
-                ✕
-              </button>
-            </div>
+    const draggingRef = useRef(false);
+    const pointerIdRef = useRef(null);
+    const startRef = useRef({ x: 0, y: 0, px: 0, py: 0 });
 
-            <div className="ai-panel__body">
-              {/* 입력창 */}
+    // ====== UX: 열릴 때 포커스 ======
+    useEffect(() => {
+        if (open) {
+            const t = setTimeout(() => textareaRef.current?.focus(), 50);
+            return () => clearTimeout(t);
+        }
+    }, [open]);
+
+    // ====== UX: ESC로 닫기 ======
+    useEffect(() => {
+        const onKeyDown = (e) => {
+            if (e.key === "Escape") setOpen(false);
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, []);
+
+    // ====== 리사이즈 시 화면 밖으로 나가지 않게 ======
+    useEffect(() => {
+        const onResize = () => setPos((p) => clampPos(p));
+        window.addEventListener("resize", onResize);
+        return () => window.removeEventListener("resize", onResize);
+    }, []);
+
+    // ====== 위치 저장 ======
+    useEffect(() => {
+        localStorage.setItem("floatingAI.pos", JSON.stringify(pos));
+    }, [pos]);
+
+    // ====== AI 실행 ======
+    const onRun = async () => {
+        const q = prompt.trim();
+        if (!q) return;
+
+        setErr("");
+        setLoading(true);
+
+        try {
+            // 1) 먼저 컨텍스트 검색 (roomId 있으면 room, 없으면 global)
+            let ctx;
+            if (roomId) {
+                ctx = await aiFindContext(Number(roomId), q);
+            } else {
+                ctx = await aiFindContextGlobal(q);
+            }
+
+            const formatted = formatContextResult(ctx);
+            setResult(formatted.text);
+            setResultMessages(formatted.messages);
+
+            // 2) 근거 메시지가 0개면 generate로 fallback (니가 원한 “필터링” UX)
+            const msgs = formatted.messages || [];
+            if (msgs.length === 0) {
+                const finalPrompt = `한국어로만 답변해줘.\n\n${q}`;
+                const out = await aiGenerate(finalPrompt);
+
+                // generate 응답 형태가 { ok, result }였던 기존 스펙도 같이 대응
+                const text =
+                    typeof out === "string"
+                        ? out
+                        : (out?.result ?? out?.message ?? JSON.stringify(out));
+
+                setResult((prev) => `${prev}\n\n🤖 (채팅에서 못 찾아서 일반 답변)\n${text}`);
+            }
+        } catch (e) {
+            setErr(e?.message || String(e));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ====== 드래그 핸들러 ======
+    const onPointerDown = (e) => {
+        if (e.button !== undefined && e.button !== 0) return;
+
+        draggingRef.current = false;
+        pointerIdRef.current = e.pointerId;
+
+        startRef.current = {
+            x: e.clientX,
+            y: e.clientY,
+            px: pos.x,
+            py: pos.y,
+        };
+
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+    };
+
+    const onPointerMove = (e) => {
+        if (pointerIdRef.current == null) return;
+        if (pointerIdRef.current !== e.pointerId) return;
+
+        const dx = e.clientX - startRef.current.x;
+        const dy = e.clientY - startRef.current.y;
+
+        if (!draggingRef.current && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+            draggingRef.current = true;
+        }
+
+        if (draggingRef.current) {
+            setPos(
+                clampPos({
+                    x: startRef.current.px + dx,
+                    y: startRef.current.py + dy,
+                })
+            );
+        }
+    };
+
+    const onPointerUp = (e) => {
+        if (pointerIdRef.current !== e.pointerId) return;
+        pointerIdRef.current = null;
+
+        if (!draggingRef.current) setOpen(true);
+    };
+
+    return (
+        <>
+            <button
+                className="ai-fab ai-bob"
+                style={{
+                    left: pos.x,
+                    top: pos.y,
+                    bottom: "auto",
+                    right: "auto",
+                    touchAction: "none",
+                    position: "fixed",
+                }}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                aria-label="Open AI assistant"
+                title="AI (drag me)"
+                type="button"
+            >
+                AI
+            </button>
+
+            {open && (
+                <div className="ai-overlay" onMouseDown={() => setOpen(false)}>
+                    <div
+                        className="ai-panel"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                    >
+                        <div className="ai-panel__header">
+                            <div className="ai-panel__title">
+                                AI Assistant {roomId ? `(room ${roomId})` : "(global)"}
+                            </div>
+                            <button className="ai-x" onClick={() => setOpen(false)} type="button">
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="ai-panel__body">
               <textarea
-                ref={textareaRef}
-                className="ai-input"
-                rows={3}
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="예) 개발1팀 개발2팀 실적 비교해줘"
+                  ref={textareaRef}
+                  className="ai-input"
+                  rows={4}
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder={
+                      roomId
+                          ? "예) 일정 마감일 변경 얘기했었나?"
+                          : "예) 개발2팀이랑 승인금액 얘기 어디서 나왔지?"
+                  }
               />
 
-              {/* 버튼들 */}
-              <div className="ai-actions">
-                <button
-                  className="ai-btn"
-                  onClick={onRun}
-                  disabled={loading || !prompt.trim()}
-                >
-                  {loading ? " 처리 중..." : " 보내기"}
-                </button>
+                            <div className="ai-actions">
+                                <button
+                                    className="ai-btn"
+                                    onClick={onRun}
+                                    disabled={loading || !prompt.trim()}
+                                    type="button"
+                                >
+                                    {loading ? "검색 중..." : "Ask"}
+                                </button>
 
-                <button
-                  className="ai-btn ai-btn--ghost"
-                  onClick={() => {
-                    setPrompt("");
-                    setResponse({
-                      message: "",
-                      summary: "",
-                      hasFile: false,
-                      downloadUrl: "",
-                      fileName: "",
-                      chartImage: "",
-                    });
-                    setErr("");
-                  }}
-                  disabled={loading}
-                >
-                  초기화
-                </button>
-              </div>
+                                <button
+                                    className="ai-btn ai-btn--ghost"
+                                    onClick={() => {
+                                        setPrompt("");
+                                        setResult("");
+                                        setResultMessages([]);
+                                        setErr("");
+                                    }}
+                                    disabled={loading}
+                                    type="button"
+                                >
+                                    Reset
+                                </button>
+                            </div>
 
-              {/* 에러 메시지 */}
-              {err && <div className="ai-error">❌ {err}</div>}
+                            {err && <div className="ai-error">{err}</div>}
 
-              {/* 결과 영역 */}
-              <div className="ai-result">
-                <div className="ai-result__label">💬 Result</div>
-                <div className="ai-result__box">
-                  {response.message ? (
-                    <>
-                      {/* 메시지 */}
-                      <p style={{ marginBottom: "10px", fontWeight: "500" }}>
-                        {response.message}
-                      </p>
+                            <div className="ai-result">
+                                <div className="ai-result__label">Result</div>
 
-                      {/* 요약 (있으면) */}
-                      {response.summary && (
-                        <pre
-                          style={{
-                            background: "#f5f5f5",
-                            padding: "12px",
-                            borderRadius: "8px",
-                            fontSize: "13px",
-                            whiteSpace: "pre-wrap",
-                            marginBottom: "12px",
-                            lineHeight: "1.5",
-                          }}
-                        >
-                          {response.summary}
-                        </pre>
-                      )}
+                                {/* ✅ 근거 메시지 클릭 -> 방 이동 (옵션) */}
+                                {Array.isArray(resultMessages) && resultMessages.length > 0 && (
+                                    <div style={{ marginBottom: 10 }}>
+                                        {resultMessages.slice(0, 5).map((m) => (
+                                            <button
+                                                key={m.messageId}
+                                                type="button"
+                                                className="ai-btn ai-btn--ghost"
+                                                style={{ marginRight: 6, marginBottom: 6 }}
+                                                onClick={() => {
+                                                    const rid = m.roomId;
+                                                    if (!rid) return;
+                                                    onOpenRoom?.(String(rid)); // Topbar에서 연결하면 바로 해당 방 열림
+                                                }}
+                                                title={`room ${m.roomId}로 이동`}
+                                            >
+                                                room {m.roomId}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
 
-                      {/* 다운로드 버튼 (파일 있으면) */}
-                      {response.hasFile && (
-                        <button
-                          onClick={handleDownload}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            padding: "12px 20px",
-                            background:
-                              "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
-                            color: "white",
-                            border: "none",
-                            borderRadius: "10px",
-                            cursor: "pointer",
-                            fontSize: "14px",
-                            fontWeight: "600",
-                            boxShadow: "0 2px 8px rgba(34, 197, 94, 0.3)",
-                          }}
-                        >
-                          엑셀 다운로드
-                          <span style={{ fontSize: "12px", opacity: 0.9 }}>
-                            ({response.fileName})
-                          </span>
-                        </button>
-                      )}
-
-                      {/* 그래프 이미지 (실적 비교용) */}
-                      {response.chartImage && (
-                        <div style={{ marginTop: "16px" }}>
-                          <img
-                            src={`data:image/png;base64,${response.chartImage}`}
-                            alt="부서 실적 비교 그래프"
-                            onClick={() => setImageModal(true)}
-                            style={{
-                              width: "100%",
-                              maxWidth: "700px",
-                              borderRadius: "12px",
-                              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                              cursor: "pointer",
-                              transition: "transform 0.2s, box-shadow 0.2s",
-                            }}
-                            onMouseOver={(e) => {
-                              e.target.style.transform = "scale(1.02)";
-                              e.target.style.boxShadow =
-                                "0 6px 20px rgba(0, 0, 0, 0.25)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.target.style.transform = "scale(1)";
-                              e.target.style.boxShadow =
-                                "0 4px 12px rgba(0, 0, 0, 0.15)";
-                            }}
-                          />
-                          <p
-                            style={{
-                              fontSize: "12px",
-                              color: "#888",
-                              marginTop: "6px",
-                              textAlign: "center",
-                            }}
-                          >
-                            🔍 클릭하면 크게 볼 수 있습니다
-                          </p>
+                                <div className="ai-result__box">
+                                    {result || "결과가 여기에 표시됩니다."}
+                                </div>
+                            </div>
                         </div>
-                      )}
-                    </>
-                  ) : (
-                    <span style={{ color: "#999" }}>
-                      결과가 여기에 표시됩니다.
-                    </span>
-                  )}
+                    </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 이미지 확대 모달 */}
-      {imageModal && response.chartImage && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0, 0, 0, 0.9)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 10000,
-            cursor: "pointer",
-            animation: "fadeIn 0.2s ease-out",
-          }}
-          onClick={() => setImageModal(false)}
-        >
-          <div
-            style={{
-              position: "relative",
-              maxWidth: "95vw",
-              maxHeight: "95vh",
-              animation: "scaleIn 0.2s ease-out",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <img
-              src={`data:image/png;base64,${response.chartImage}`}
-              alt="부서 실적 비교 그래프 (확대)"
-              style={{
-                maxWidth: "95vw",
-                maxHeight: "85vh",
-                borderRadius: "16px",
-                boxShadow: "0 12px 48px rgba(0, 0, 0, 0.5)",
-              }}
-            />
-            <button
-              onClick={() => setImageModal(false)}
-              style={{
-                position: "absolute",
-                top: "-50px",
-                right: "0",
-                background: "rgba(255, 255, 255, 0.1)",
-                border: "none",
-                color: "white",
-                fontSize: "28px",
-                cursor: "pointer",
-                width: "44px",
-                height: "44px",
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                transition: "background 0.2s",
-              }}
-              onMouseOver={(e) =>
-                (e.target.style.background = "rgba(255, 255, 255, 0.2)")
-              }
-              onMouseOut={(e) =>
-                (e.target.style.background = "rgba(255, 255, 255, 0.1)")
-              }
-            >
-              ✕
-            </button>
-            <p
-              style={{
-                textAlign: "center",
-                color: "rgba(255, 255, 255, 0.6)",
-                marginTop: "16px",
-                fontSize: "14px",
-              }}
-            >
-              ESC 또는 바깥 영역을 클릭하면 닫힙니다
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* 모달 애니메이션 스타일 */}
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes scaleIn {
-          from { transform: scale(0.9); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-      `}</style>
-    </>
-  );
+            )}
+        </>
+    );
 }

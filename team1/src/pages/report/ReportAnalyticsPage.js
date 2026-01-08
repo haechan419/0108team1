@@ -5,7 +5,7 @@ import { useSelector } from "react-redux";
 import AppLayout from "../../components/layout/AppLayout";
 import "../../styles/report.css";
 import { REPORT_TYPES } from "../../constants/reportTypes";
-import jwtAxios  from "../../util/jwtUtil";
+import axiosInstance from "../../api/axiosInstance"; // ✅ 경로 맞춰줘 (네 프로젝트 기준)
 
 export default function ReportAnalyticsPage() {
     // ✅ 링크(a href)용: 파일 다운로드를 새 탭으로 열 때만 사용
@@ -100,7 +100,7 @@ export default function ReportAnalyticsPage() {
     const fetchSchedules = async () => {
         try {
             setIsSchedulesLoading(true);
-            const res = await jwtAxios.get(SCHEDULE_BASE);
+            const res = await axiosInstance.get(SCHEDULE_BASE);
             const data = res.data;
             setSchedules(data?.items ?? (Array.isArray(data) ? data : []));
         } catch (e) {
@@ -112,17 +112,17 @@ export default function ReportAnalyticsPage() {
     };
 
     const createSchedule = async (payload) => {
-        const res = await jwtAxios.post(SCHEDULE_BASE, payload);
+        const res = await axiosInstance.post(SCHEDULE_BASE, payload);
         return res.data;
     };
 
     const updateSchedule = async (id, payload) => {
-        const res = await jwtAxios.put(`${SCHEDULE_BASE}/${id}`, payload);
+        const res = await axiosInstance.put(`${SCHEDULE_BASE}/${id}`, payload);
         return res.data;
     };
 
     const runScheduleNow = async (id) => {
-        const res = await jwtAxios.post(`${SCHEDULE_BASE}/${id}/run`);
+        const res = await axiosInstance.post(`${SCHEDULE_BASE}/${id}/run`);
         return res.data;
     };
 
@@ -195,7 +195,7 @@ export default function ReportAnalyticsPage() {
 
         (async () => {
             try {
-                const res = await jwtAxios.get("/admin/departments");
+                const res = await axiosInstance.get("/admin/departments");
                 const list = Array.isArray(res.data) ? res.data : (res.data?.items ?? []);
                 setDepartments(list);
             } catch (e) {
@@ -404,13 +404,13 @@ export default function ReportAnalyticsPage() {
                     format: effectiveFormat,
 
                     // ✅ 여기 박는거임
-                    departmentName: role === "ADMIN" && dataScope === "DEPT" ? dept : null,
+                    department: role === "ADMIN" && dataScope === "DEPT" ? dept : null,
                 },
             };
 
             console.log("[GEN payload]", payload);
 
-            const res = await jwtAxios.post("/reports/generate", payload);
+            const res = await axiosInstance.post("/reports/generate", payload);
             const data = res.data;
 
             setGeneratedReportId(data.reportId);
@@ -442,7 +442,7 @@ export default function ReportAnalyticsPage() {
         (async () => {
             try {
                 setIsFilesLoading(true);
-                const res = await jwtAxios.get(`/reports/${generatedReportId}/files`);
+                const res = await axiosInstance.get(`/reports/${generatedReportId}/files`);
                 const data = res.data;
                 const list = Array.isArray(data) ? data : data.files;
                 setFiles(list ?? []);
@@ -484,7 +484,7 @@ export default function ReportAnalyticsPage() {
     const handleDownload = async () => {
         if (!generatedReportId) return;
         try {
-            const res = await jwtAxios.get(`/reports/${generatedReportId}/download`, {
+            const res = await axiosInstance.get(`/reports/${generatedReportId}/download`, {
                 responseType: "blob",
             });
             downloadBlobFromAxios(res, "report");
@@ -497,7 +497,7 @@ export default function ReportAnalyticsPage() {
 
     const handleDownloadFile = async (fileId, fileName) => {
         try {
-            const res = await jwtAxios.get(`/report-files/${fileId}/download`, {
+            const res = await axiosInstance.get(`/report-files/${fileId}/download`, {
                 responseType: "blob",
             });
             downloadBlobFromAxios(res, fileName || "report");
@@ -520,7 +520,7 @@ export default function ReportAnalyticsPage() {
             setIsLogsLoading(true);
             setLogsMode({ type: "REPORT", fileId: null });
 
-            const res = await jwtAxios.get(`/reports/${reportId}/downloads`);
+            const res = await axiosInstance.get(`/reports/${reportId}/downloads`);
             const data = res.data;
             const list = Array.isArray(data)
                 ? data
@@ -540,7 +540,7 @@ export default function ReportAnalyticsPage() {
             setIsLogsLoading(true);
             setLogsMode({ type: "FILE", fileId });
 
-            const res = await jwtAxios.get(`/report-files/${fileId}/downloads`);
+            const res = await axiosInstance.get(`/report-files/${fileId}/downloads`);
             const data = res.data;
             const list = Array.isArray(data)
                 ? data
@@ -845,6 +845,7 @@ export default function ReportAnalyticsPage() {
                             </ul>
                         )}
                     </div>
+
                 )}
 
                 {/* 5) Automation / Schedules (ADMIN only) */}

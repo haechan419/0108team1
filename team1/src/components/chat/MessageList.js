@@ -16,7 +16,7 @@ function dateKey(iso) {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
     const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`; // grouping key
+    return `${y}-${m}-${day}`;
 }
 
 function formatTime(iso) {
@@ -28,11 +28,37 @@ function formatTime(iso) {
     return `${ampm} ${hh}:${m}`;
 }
 
-export default function MessageList({
-                                        messages,
-                                        // 읽음표시용: 상대가 어디까지 읽었는지(상대 member의 lastReadMessageId)
-                                        otherLastReadMessageId,
-                                    }) {
+// ✅ 파일명만 깔끔하게
+function shortName(name = "") {
+    if (!name) return "file";
+    if (name.length <= 28) return name;
+    const dot = name.lastIndexOf(".");
+    if (dot > 0 && dot < name.length - 1) {
+        const ext = name.slice(dot);
+        return name.slice(0, 22) + "…" + ext;
+    }
+    return name.slice(0, 26) + "…";
+}
+
+function formatBytes(bytes) {
+    const n = Number(bytes);
+    if (!Number.isFinite(n) || n <= 0) return "";
+    const units = ["B", "KB", "MB", "GB"];
+    let v = n;
+    let i = 0;
+    while (v >= 1024 && i < units.length - 1) {
+        v /= 1024;
+        i++;
+    }
+    const fixed = i === 0 ? String(Math.round(v)) : v.toFixed(1);
+    return `${fixed} ${units[i]}`;
+}
+
+function isImageMime(mime = "") {
+    return mime.startsWith("image/");
+}
+
+export default function MessageList({ messages, otherLastReadMessageId }) {
     const bottomRef = useRef(null);
 
     const meId = useMemo(() => {
@@ -49,7 +75,7 @@ export default function MessageList({
         return arr;
     }, [messages]);
 
-    //  2) 렌더용 “날짜칩 + 메시지” 합성
+    // 2) 렌더용 “날짜칩 + 메시지” 합성
     const rows = useMemo(() => {
         const out = [];
         let prevKey = null;
@@ -65,7 +91,6 @@ export default function MessageList({
         return out;
     }, [sorted]);
 
-    // 최신이 아래로 가므로, 새 메시지 오면 맨 아래로 스크롤
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [rows.length]);
@@ -89,6 +114,10 @@ export default function MessageList({
                 const id = m.messageId ?? m.id;
                 const mine = meId != null && Number(m.senderId) === Number(meId);
 
+                const attachments = Array.isArray(m.attachments) ? m.attachments : [];
+                const hasAtt = attachments.length > 0;
+                const text = (m.content ?? "").trim();
+                const hasText = text.length > 0;
 
                 const isReadByOther =
                     mine &&
@@ -100,8 +129,59 @@ export default function MessageList({
                         {!mine && <div className="kcAvatar">{String(m.senderId).slice(-2)}</div>}
 
                         <div className="kcBubbleWrap">
-                            <div className={`kcBubble ${mine ? "me" : "other"}`}>{m.content}</div>
+                            {/* ✅ 1) 텍스트 버블: content 있을 때만 표시 */}
+                            {hasText && (
+                                <div className={`kcBubble ${mine ? "me" : "other"}`}>
+                                    {text}
+                                </div>
+                            )}
 
+                            {/* ✅ 2) 첨부파일 카드들 */}
+                            {hasAtt && (
+                                <div className={`kcAttList ${mine ? "me" : "other"}`}>
+                                    {attachments.map((a) => {
+                                        const attId = a.attachmentId ?? a.id;
+                                        const name = a.originalName ?? "file";
+                                        const mime = a.mimeType ?? "";
+                                        const size = a.size ?? a.fileSize ?? null;
+                                        const url = a.url ?? a.fileUrl ?? "";
+
+                                        // 이미지면 미리보기(선택) + 다운로드
+                                        const img = isImageMime(mime);
+
+                                        return (
+                                            <a
+                                                key={`att-${id}-${attId}`}
+                                                className={`kcAttCard ${mine ? "me" : "other"}`}
+                                                href={url}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                title={name}
+                                            >
+                                                {img ? (
+                                                    <div className="kcAttThumb">
+                                                        <img src={url} alt={name} />
+                                                    </div>
+                                                ) : (
+                                                    <div className="kcAttIcon">📎</div>
+                                                )}
+
+                                                <div className="kcAttMeta">
+                                                    <div className="kcAttName">{shortName(name)}</div>
+                                                    <div className="kcAttSub">
+                                                        {mime ? mime : "file"}
+                                                        {size ? ` · ${formatBytes(size)}` : ""}
+                                                    </div>
+                                                </div>
+
+                                                <div className="kcAttAction">다운로드</div>
+                                            </a>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {/* ✅ 3) 시간/읽음 */}
                             <div className={`kcMeta ${mine ? "me" : "other"}`}>
                                 {mine && (
                                     <span className={`kcRead ${isReadByOther ? "read" : "unread"}`}>

@@ -1,12 +1,15 @@
 package com.Team1_Back.domain;
 
-
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
+@NoArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PRIVATE) // ✅ Builder 안정화용
+@Builder
 @Getter @Setter
 @Entity
 @Table(name = "chat_message",
@@ -26,13 +29,22 @@ public class ChatMessage {
     @Column(name="sender_id", nullable = false)
     private Long senderId;
 
-    @Column(name="content", nullable = false, columnDefinition = "TEXT")
+    // ✅ 파일만 보내는 메시지도 있으니 nullable=true 권장
+    @Column(name="content", columnDefinition = "TEXT")
     private String content;
 
-    @Column(name="created_at", nullable = false)
-    private Instant createdAt = Instant.now();
+    @Column(name="created_at", nullable=false, updatable=false)
+    private Instant createdAt;
 
     @Column(name="deleted_at")
     private Instant deletedAt;
-}
 
+    @PrePersist
+    public void prePersist() {
+        if (this.createdAt == null) this.createdAt = Instant.now();
+    }
+
+    @OneToMany(mappedBy = "message", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @Builder.Default
+    private List<ChatAttachment> attachments = new ArrayList<>();
+}

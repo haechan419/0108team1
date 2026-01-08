@@ -38,15 +38,20 @@ public class PdfReportGenerator {
 
         Paragraph title = new Paragraph("Report Summary", new Font(Font.HELVETICA, 16, Font.BOLD));
         doc.add(title);
+
         doc.add(new Paragraph("Confidential", new Font(Font.HELVETICA, 10, Font.ITALIC)));
         doc.add(new Paragraph(" "));
 
         doc.add(kv("Report Type", job.getReportTypeId()));
+        doc.add(kv("Report ID", String.valueOf(job.getId())));
+        doc.add(kv("Dept(snapshot)", job.getDepartmentSnapshot()));
+        doc.add(kv("Scope", displayScopeWithDept(job)));
+
         doc.add(kv("Period", job.getPeriod()));
-        doc.add(kv("Scope", displayScope(job.getDataScope())));
+
         doc.add(kv("Category", job.getCategoryJson()));
         doc.add(kv("Requested By", String.valueOf(job.getRequestedBy())));
-        doc.add(kv("Dept (snapshot)", job.getDepartmentSnapshot()));
+
         doc.add(new Paragraph(" "));
 
         // ✅ EXPENSE 승인합계용 값(없으면 0/0)
@@ -60,5 +65,20 @@ public class PdfReportGenerator {
         String val = (v == null || v.isBlank()) ? "-" : v;
         return new Paragraph(k + " : " + val, new Font(Font.HELVETICA, 11));
     }
+
+    private String displayScopeWithDept(ReportJob job) {
+        if (job.getDataScope() == null) return "";
+        return switch (job.getDataScope()) {
+            case MY -> "My Data";
+            case ALL -> "All";
+            case DEPT -> {
+                String dept = job.getDepartmentSnapshot();
+                yield (dept == null || dept.isBlank())
+                        ? "Department"
+                        : "Department - " + dept;
+            }
+        };
+    }
+
 }
 
