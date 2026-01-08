@@ -9,6 +9,11 @@ const initialState = {
   pageResponse: null,
 };
 
+/**
+ * 지출 내역 목록 조회 비동기 액션
+ * 
+ * @param {Object} params - 조회 파라미터 (page, size, status, startDate, endDate)
+ */
 export const fetchExpenses = createAsyncThunk(
   "expense/fetchExpenses",
   async (params) => {
@@ -17,16 +22,31 @@ export const fetchExpenses = createAsyncThunk(
   }
 );
 
+/**
+ * 지출 내역 상세 조회 비동기 액션
+ * 
+ * @param {number} id - 지출 내역 ID
+ */
 export const fetchExpense = createAsyncThunk("expense/fetchExpense", async (id) => {
   const response = await expenseApi.getExpense(id);
   return response.data;
 });
 
+/**
+ * 지출 내역 생성 비동기 액션
+ * 
+ * @param {Object} data - 지출 내역 데이터
+ */
 export const createExpense = createAsyncThunk("expense/createExpense", async (data) => {
   const response = await expenseApi.createExpense(data);
   return response.data;
 });
 
+/**
+ * 지출 내역 수정 비동기 액션
+ * 
+ * @param {Object} payload - 수정 정보 (id, data)
+ */
 export const updateExpense = createAsyncThunk(
   "expense/updateExpense",
   async ({ id, data }) => {
@@ -35,11 +55,21 @@ export const updateExpense = createAsyncThunk(
   }
 );
 
+/**
+ * 지출 내역 삭제 비동기 액션
+ * 
+ * @param {number} id - 지출 내역 ID
+ */
 export const deleteExpense = createAsyncThunk("expense/deleteExpense", async (id) => {
   await expenseApi.deleteExpense(id);
   return id;
 });
 
+/**
+ * 지출 내역 제출 비동기 액션
+ * 
+ * @param {Object} payload - 제출 정보 (id, data)
+ */
 export const submitExpense = createAsyncThunk(
   "expense/submitExpense",
   async ({ id, data }) => {
@@ -67,14 +97,11 @@ const expenseSlice = createSlice({
       })
       .addCase(fetchExpenses.fulfilled, (state, action) => {
         state.loading = false;
-        console.log("✅ 지출 목록 조회 성공:", action.payload);
-        console.log("📊 조회된 지출 내역 수:", action.payload.content?.length || 0);
         state.expenses = action.payload.content || [];
         state.pageResponse = action.payload;
       })
       .addCase(fetchExpenses.rejected, (state, action) => {
         state.loading = false;
-        console.error("❌ 지출 목록 조회 실패:", action.error);
         state.error = action.error.message || "지출 내역 조회에 실패했습니다.";
       })
       .addCase(fetchExpense.pending, (state) => {

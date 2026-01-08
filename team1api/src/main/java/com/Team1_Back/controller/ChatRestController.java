@@ -1,14 +1,13 @@
 package com.Team1_Back.controller;
 
-
 import com.Team1_Back.dto.DirectRoomCreateRequest;
 import com.Team1_Back.dto.DirectRoomCreateResponse;
 import com.Team1_Back.dto.ReadUpdateRequest;
 import com.Team1_Back.dto.ChatMessageResponse;
 import com.Team1_Back.security.CurrentUser;
-
 import com.Team1_Back.service.ChatService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,6 +19,7 @@ import java.util.Map;
 public class ChatRestController {
 
     private final ChatService chatService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @PostMapping("/rooms/direct")
     public DirectRoomCreateResponse createOrGetDirect(@RequestBody DirectRoomCreateRequest req) {
@@ -40,15 +40,25 @@ public class ChatRestController {
     }
 
     @PostMapping("/rooms/{roomId}/read")
-    public Map<String, Object> read(
+    public void read(
             @PathVariable Long roomId,
             @RequestBody(required = false) ReadUpdateRequest req
     ) {
         Long meId = CurrentUser.id();
+
         Long lastReadMessageId = (req == null) ? null : req.getLastReadMessageId();
 
         chatService.updateRead(roomId, meId, lastReadMessageId);
-        return Map.of("success", true);
-    }
 
+        // ✅ READ 이벤트 브로드캐스트 (내 메시지 '1/2' 실시간 갱신용)
+        messagingTemplate.convertAndSend(
+                "/topic/room/" + roomId + "/read",
+                Map.of(
+                        "type", "READ",
+                        "roomId", roomId,
+                        "userId", meId,
+                        "lastReadMessageId", lastReadMessageId
+                )
+        );
+    }
 }

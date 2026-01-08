@@ -14,9 +14,11 @@ from pydantic import BaseModel
 from typing import Optional
 import os
 
-from services.ollama_service import OllamaService
-from services.attendance_service import AttendanceService
-from services.performance_service import PerformanceService
+from app.services.ollama_service import OllamaService
+from app.services.attendance_service import AttendanceService
+from app.services.performance_service import PerformanceService
+# ✅ 추가: 영수증 OCR 라우터 import (영수증 OCR 통합)
+from app.api.receipt_router import router as receipt_router
 
 # FastAPI 앱 생성
 app = FastAPI(
@@ -38,6 +40,10 @@ app.add_middleware(
 ollama_service = OllamaService()
 attendance_service = AttendanceService(ollama_service)
 performance_service = PerformanceService(ollama_service)
+
+# ✅ 추가: 영수증 OCR 라우터 등록 (영수증 OCR 통합)
+# /api/ai/receipt/extract 엔드포인트가 추가됨
+app.include_router(receipt_router)
 
 # DTO 정의
 class AttendanceAiRequest(BaseModel):

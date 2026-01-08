@@ -48,6 +48,46 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             @Param("endDate") LocalDate endDate,
             Pageable pageable);
 
+    // 사용자별 + 기간별 지출 내역 조회 - 시작일만 (상신일 기준: createdAt)
+    @EntityGraph(attributePaths = { "writer" })
+    @Query("SELECT e FROM Expense e WHERE e.writer.id = :userId " +
+            "AND DATE(e.createdAt) >= :startDate")
+    Page<Expense> findByUserIdAndStartDate(
+            @Param("userId") Long userId,
+            @Param("startDate") LocalDate startDate,
+            Pageable pageable);
+
+    // 사용자별 + 기간별 지출 내역 조회 - 종료일만 (상신일 기준: createdAt)
+    @EntityGraph(attributePaths = { "writer" })
+    @Query("SELECT e FROM Expense e WHERE e.writer.id = :userId " +
+            "AND DATE(e.createdAt) <= :endDate")
+    Page<Expense> findByUserIdAndEndDate(
+            @Param("userId") Long userId,
+            @Param("endDate") LocalDate endDate,
+            Pageable pageable);
+
+    // 사용자별 + 상태별 + 시작일만 (상신일 기준: createdAt)
+    @EntityGraph(attributePaths = { "writer" })
+    @Query("SELECT e FROM Expense e WHERE e.writer.id = :userId " +
+            "AND e.status = :status " +
+            "AND DATE(e.createdAt) >= :startDate")
+    Page<Expense> findByUserIdAndStatusAndStartDate(
+            @Param("userId") Long userId,
+            @Param("status") ApprovalStatus status,
+            @Param("startDate") LocalDate startDate,
+            Pageable pageable);
+
+    // 사용자별 + 상태별 + 종료일만 (상신일 기준: createdAt)
+    @EntityGraph(attributePaths = { "writer" })
+    @Query("SELECT e FROM Expense e WHERE e.writer.id = :userId " +
+            "AND e.status = :status " +
+            "AND DATE(e.createdAt) <= :endDate")
+    Page<Expense> findByUserIdAndStatusAndEndDate(
+            @Param("userId") Long userId,
+            @Param("status") ApprovalStatus status,
+            @Param("endDate") LocalDate endDate,
+            Pageable pageable);
+
     // 사용자 ID와 지출 ID로 조회 (권한 확인용)
     @EntityGraph(attributePaths = { "writer" })
     @Query("SELECT e FROM Expense e WHERE e.id = :id AND e.writer.id = :writerId")
@@ -67,7 +107,12 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     @Query("SELECT e FROM Expense e WHERE e.status != com.Team1_Back.domain.ApprovalStatus.DRAFT")
     Page<Expense> findAllSubmitted(Pageable pageable);
 
-    // 부서별 지출 집계 (mallapi 패턴: native query 사용)
+    /**
+     * 부서별 지출 집계 조회
+     * 
+     * @param status 승인 상태
+     * @return 부서별 집계 결과 배열
+     */
     @Query(value = "SELECT u.department_name as departmentName, " +
             "       COUNT(e.id) as expenseCount, " +
             "       COALESCE(SUM(e.amount), 0) as totalAmount " +
@@ -78,7 +123,12 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             "GROUP BY u.department_name", nativeQuery = true)
     List<Object[]> findDepartmentStatistics(@Param("status") String status);
 
-    // 카테고리별 지출 집계 (mallapi 패턴: native query 사용)
+    /**
+     * 카테고리별 지출 집계 조회
+     * 
+     * @param status 승인 상태
+     * @return 카테고리별 집계 결과 배열
+     */
     @Query(value = "SELECT e.category as categoryName, " +
             "       COUNT(e.id) as expenseCount, " +
             "       COALESCE(SUM(e.amount), 0) as totalAmount " +

@@ -38,11 +38,25 @@ ChartJS.register(
 export default function DashboardPage() {
   const dispatch = useDispatch();
   const { todos, activeTodos, overdueTodos } = useSelector((state) => state.todo);
+  const loginState = useSelector((state) => state.loginSlice);
   const [monthlyExpenseData, setMonthlyExpenseData] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // ADMIN 권한 체크
+  const isAdmin = useMemo(() => {
+    return loginState?.roleNames?.includes("ADMIN") ||
+      loginState?.role === "ADMIN" ||
+      loginState?.roleName === "ADMIN" ||
+      false;
+  }, [loginState]);
+
   // 월별 지출 추이 데이터 로드 함수
   const loadMonthlyExpenseTrend = useCallback(async () => {
+    // ADMIN이 아닌 경우 데이터 로드하지 않음
+    if (!isAdmin) {
+      return;
+    }
+
     setLoading(true);
     try {
       const data = await getMonthlyExpenseTrend({ status: "APPROVED" });
@@ -53,15 +67,19 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     // 초기 데이터 로드
     dispatch(fetchTodos());
     dispatch(fetchActiveTodos());
     dispatch(fetchOverdueTodos());
-    loadMonthlyExpenseTrend();
-  }, [dispatch, loadMonthlyExpenseTrend]);
+
+    // ADMIN인 경우에만 월별 지출 추이 데이터 로드
+    if (isAdmin) {
+      loadMonthlyExpenseTrend();
+    }
+  }, [dispatch, loadMonthlyExpenseTrend, isAdmin]);
 
   // 차트 데이터 준비 (useMemo로 최적화)
   const chartData = useMemo(() => ({
@@ -185,25 +203,27 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* 월별 지출 추이 - 아래에 배치 */}
-        <div className="monthly-expense-row">
-          <div className="panel monthly-expense-chart-panel">
-            <div className="section-title">월별 지출 추이</div>
-            <div className="monthly-expense-chart-container">
-              {loading ? (
-                <div className="monthly-expense-chart-loading">
-                  로딩 중...
-                </div>
-              ) : monthlyExpenseData.length === 0 ? (
-                <div className="monthly-expense-chart-empty">
-                  데이터가 없습니다.
-                </div>
-              ) : (
-                <Line data={chartData} options={chartOptions} />
-              )}
+        {/* 월별 지출 추이 - ADMIN만 보이도록 조건부 렌더링 */}
+        {isAdmin && (
+          <div className="monthly-expense-row">
+            <div className="panel monthly-expense-chart-panel">
+              <div className="section-title">월별 지출 추이</div>
+              <div className="monthly-expense-chart-container">
+                {loading ? (
+                  <div className="monthly-expense-chart-loading">
+                    로딩 중...
+                  </div>
+                ) : monthlyExpenseData.length === 0 ? (
+                  <div className="monthly-expense-chart-empty">
+                    데이터가 없습니다.
+                  </div>
+                ) : (
+                  <Line data={chartData} options={chartOptions} />
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </AppLayout>
   );

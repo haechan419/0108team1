@@ -6,7 +6,6 @@ import com.Team1_Back.dto.*;
 import com.Team1_Back.repository.UserProfileImageRepository;
 import com.Team1_Back.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -19,7 +18,6 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 @Transactional(readOnly = true)
 public class AdminUserServiceImpl implements AdminUserService {
 
@@ -90,11 +88,7 @@ public class AdminUserServiceImpl implements AdminUserService {
             thumbnailUrl = "/api/view/user_image/s_" + fileName;
         }
 
-        // ✅ role 값 설정
-        String roleValue = user.getRole() != null ? user.getRole().name() : "USER";
-        log.info("사원 정보 조회 - userId: {}, role: {}", id, roleValue);
-
-        UserDetailsDTO dto = UserDetailsDTO.builder()
+        return UserDetailsDTO.builder()
                 .id(user.getId())
                 .employeeNo(user.getEmployeeNo())
                 .name(user.getName())
@@ -105,7 +99,6 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .addressDetail(user.getAddressDetail())
                 .departmentName(user.getDepartmentName())
                 .positionName(user.getPosition())
-                .role(roleValue)
                 .isLocked(user.isLocked())
                 .isActive(user.getIsActive())
                 .createdUserAt(user.getCreatedUserAt())
@@ -113,9 +106,6 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .profileImageUrl(profileImageUrl)
                 .thumbnailUrl(thumbnailUrl)
                 .build();
-        
-        log.info("UserDetailsDTO 반환 - role: {}", dto.getRole());
-        return dto;
     }
 
     @Override

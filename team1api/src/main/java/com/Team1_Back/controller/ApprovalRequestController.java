@@ -173,7 +173,6 @@ public class ApprovalRequestController {
         
         Long userId = principal.getId();
         
-        // 관리자 전용 API이므로 권한 체크
         if (!userService.isAdmin(userId)) {
             log.warn("관리자 권한이 없습니다. userId: " + userId);
             throw new RuntimeException("관리자 권한이 필요합니다.");

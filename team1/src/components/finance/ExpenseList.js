@@ -2,6 +2,17 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./ExpenseList.css";
 
+/**
+ * 지출 내역 목록 컴포넌트
+ * 
+ * @param {Object} props - 컴포넌트 props
+ * @param {Array} props.expenses - 지출 내역 배열
+ * @param {Object} props.pageResponse - 페이지네이션 응답
+ * @param {boolean} props.loading - 로딩 상태
+ * @param {Function} props.onExpenseClick - 지출 내역 클릭 핸들러
+ * @param {Function} props.onPageChange - 페이지 변경 핸들러
+ * @component
+ */
 const ExpenseList = ({
   expenses,
   pageResponse,
@@ -11,8 +22,13 @@ const ExpenseList = ({
 }) => {
   const navigate = useNavigate();
 
+  /**
+   * 상태 라벨 반환
+   * 
+   * @param {string} status - 승인 상태
+   * @returns {string} 상태 라벨
+   */
   const getStatusLabel = (status) => {
-    // REQUEST_MORE_INFO 상태는 표시하지 않음
     if (status === "REQUEST_MORE_INFO") {
       return "";
     }
@@ -25,6 +41,12 @@ const ExpenseList = ({
     return statusMap[status || ""] || status;
   };
 
+  /**
+   * 상태 CSS 클래스 반환
+   * 
+   * @param {string} status - 승인 상태
+   * @returns {string} CSS 클래스명
+   */
   const getStatusClass = (status) => {
     const classMap = {
       DRAFT: "status-draft",
@@ -35,6 +57,11 @@ const ExpenseList = ({
     return classMap[status || ""] || "";
   };
 
+  /**
+   * 행 클릭 핸들러
+   * 
+   * @param {Object} expense - 클릭된 지출 내역 객체
+   */
   const handleRowClick = (expense) => {
     if (onExpenseClick) {
       onExpenseClick(expense);
@@ -49,8 +76,6 @@ const ExpenseList = ({
     );
   }
 
-  // expenses가 undefined이거나 배열이 아닌 경우 빈 배열로 처리
-  // REQUEST_MORE_INFO 상태는 프론트엔드에서 필터링하여 표시하지 않음
   const expensesList = Array.isArray(expenses) 
     ? expenses.filter((expense) => expense.status !== "REQUEST_MORE_INFO")
     : [];
@@ -91,7 +116,9 @@ const ExpenseList = ({
                 </td>
                 <td>{expense.createdAt ? expense.createdAt.split("T")[0] : "-"}</td>
                 <td className="amount-cell">
-                  {expense.amount ? expense.amount.toLocaleString() : 0}원
+                  {expense.amount && expense.amount > 0 
+                    ? `${expense.amount.toLocaleString()}원` 
+                    : "-"}
                 </td>
                 <td>{expense.userName || "-"}</td>
                 <td>{expense.receiptDate || "-"}</td>
@@ -120,7 +147,6 @@ const ExpenseList = ({
         </table>
       </div>
 
-      {/* Pagination */}
       {pageResponse && pageResponse.pageNumList && Array.isArray(pageResponse.pageNumList) && pageResponse.pageNumList.length > 0 && (
         <div className="pagination">
           {pageResponse.pageNumList.map((page) => (

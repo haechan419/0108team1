@@ -1,5 +1,4 @@
 package com.Team1_Back.service;
-
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import com.Team1_Back.domain.ChatMessage;
@@ -42,14 +41,13 @@ public class ChatService {
     // =========================
     @Transactional
     public Long getOrCreateDirectRoom(Long meId, Long targetId) {
-        if (meId.equals(targetId))
-            throw new IllegalArgumentException("Cannot chat with self");
+        if (meId.equals(targetId)) throw new IllegalArgumentException("Cannot chat with self");
 
         String key = directKey(meId, targetId);
 
         ChatRoom room = roomRepo.findByDirectKey(key).orElseGet(() -> {
             ChatRoom r = new ChatRoom();
-            r.setType("DIRECT"); // 너 규칙 유지
+            r.setType("DIRECT");     // 너 규칙 유지
             r.setDirectKey(key);
             return roomRepo.save(r);
         });
@@ -64,8 +62,7 @@ public class ChatService {
     private void insertMemberIfAbsent(Long roomId, Long userId) {
         ChatRoomMemberId pk = new ChatRoomMemberId(roomId, userId);
 
-        if (memberRepo.existsById(pk))
-            return;
+        if (memberRepo.existsById(pk)) return;
 
         ChatRoomMember m = new ChatRoomMember();
         m.setId(pk);
@@ -88,8 +85,7 @@ public class ChatService {
     // =========================
     @Transactional
     public ChatMessageResponse sendMessage(Long roomId, Long senderId, String content) {
-        if (content == null || content.trim().isEmpty())
-            throw new IllegalArgumentException("Empty content");
+        if (content == null || content.trim().isEmpty()) throw new IllegalArgumentException("Empty content");
 
         assertMember(roomId, senderId);
 
@@ -119,7 +115,8 @@ public class ChatService {
             messagingTemplate.convertAndSendToUser(
                     String.valueOf(uid),
                     "/queue/rooms",
-                    Map.of("type", "ROOMS_CHANGED"));
+                    Map.of("type", "ROOMS_CHANGED")
+            );
         }
     }
 
@@ -135,16 +132,23 @@ public class ChatService {
         Long meLast = null;
         Long otherLast = null;
 
+        Map<Long, Long> map = new java.util.HashMap<>();
+
         for (ChatRoomMember m : members) {
             Long uid = m.getId().getUserId();
-            if (uid.equals(meId)) {
-                meLast = m.getLastReadMessageId();
-            } else {
-                otherLast = m.getLastReadMessageId();
-            }
+            Long last = m.getLastReadMessageId(); // null 가능
+
+            map.put(uid, last);
+
+            if (uid.equals(meId)) meLast = last;
         }
 
-        return new ChatRoomMetaResponse(roomId, meLast, otherLast);
+        return new ChatRoomMetaResponse(
+                roomId,
+                meLast,
+                map,
+                members.size()
+        );
     }
 
     // =========================
@@ -156,8 +160,7 @@ public class ChatService {
         List<ChatMessage> list = messageRepo.findPage(roomId, cursor);
         return list.stream()
                 .limit(Math.max(1, Math.min(limit, 50)))
-                .map(m -> new ChatMessageResponse(m.getId(), m.getRoomId(), m.getSenderId(), m.getContent(),
-                        m.getCreatedAt()))
+                .map(m -> new ChatMessageResponse(m.getId(), m.getRoomId(), m.getSenderId(), m.getContent(), m.getCreatedAt()))
                 .toList();
     }
 
@@ -187,6 +190,7 @@ public class ChatService {
         // memberRepo.save(m);
     }
 
+
     @Transactional
     public Long createGroupRoom(Long meId, List<Long> memberUserIds) {
         ChatRoom room = new ChatRoom();
@@ -196,8 +200,7 @@ public class ChatService {
 
         List<Long> all = new java.util.ArrayList<>();
         all.add(meId);
-        if (memberUserIds != null)
-            all.addAll(memberUserIds);
+        if (memberUserIds != null) all.addAll(memberUserIds);
 
         for (Long uid : all.stream().distinct().toList()) {
             insertMemberIfAbsent(room.getId(), uid);
@@ -206,16 +209,18 @@ public class ChatService {
         return room.getId();
     }
 
+
     @Transactional
     public void invite(Long roomId, Long meId, List<Long> userIds) {
         assertMember(roomId, meId);
 
-        if (userIds == null || userIds.isEmpty())
-            return;
+        if (userIds == null || userIds.isEmpty()) return;
 
         for (Long uid : userIds.stream().distinct().toList()) {
             insertMemberIfAbsent(roomId, uid);
         }
     }
+
+
 
 }

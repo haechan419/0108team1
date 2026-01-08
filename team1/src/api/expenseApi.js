@@ -1,5 +1,10 @@
 import jwtAxios from "../util/jwtUtil";
 
+/**
+ * 지출 내역 API 클라이언트
+ * 
+ * @namespace expenseApi
+ */
 export const expenseApi = {
   getExpenses: (params) => {
     return jwtAxios.get("/receipt/expenses/list", { params });

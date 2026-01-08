@@ -112,9 +112,9 @@ public class AdminReceiptServiceImpl implements AdminReceiptService {
             throw new java.util.NoSuchElementException("영수증을 찾을 수 없습니다.");
         }
 
-        // OCR 기능이 아직 구현되지 않았으므로, OCR 데이터가 없을 때는 NoSuchElementException 던짐
+        // OCR 추출 결과 조회 (없을 경우 예외 발생)
         ReceiptAiExtraction extraction = receiptAiExtractionRepository.findByReceiptId(id)
-                .orElseThrow(() -> new java.util.NoSuchElementException("OCR 추출 결과를 찾을 수 없습니다. OCR 기능이 아직 구현되지 않았습니다."));
+                .orElseThrow(() -> new java.util.NoSuchElementException("OCR 추출 결과를 찾을 수 없습니다. 영수증 업로드 후 OCR 처리가 완료되지 않았거나 실패한 것 같습니다."));
 
         return com.Team1_Back.dto.ReceiptExtractionDTO.builder()
                 .receiptId(id)
@@ -254,6 +254,7 @@ public class AdminReceiptServiceImpl implements AdminReceiptService {
             dto.setExtractedAmount(extraction.getExtractedAmount());
             dto.setExtractedMerchant(extraction.getExtractedMerchant());
             dto.setExtractedCategory(extraction.getExtractedCategory());
+            dto.setExtractedDescription(extraction.getExtractedDescription());
             dto.setConfidence(extraction.getConfidence());
             dto.setExtractionCreatedAt(extraction.getCreatedAt());
         }

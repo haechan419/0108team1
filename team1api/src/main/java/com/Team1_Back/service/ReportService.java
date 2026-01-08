@@ -1,5 +1,6 @@
 package com.Team1_Back.service;
 
+import com.Team1_Back.domain.Expense;
 import com.Team1_Back.dto.*;
 import com.Team1_Back.constants.ReportTypes;
 import com.Team1_Back.domain.ReportDownloadLog;
@@ -10,10 +11,8 @@ import com.Team1_Back.domain.enums.OutputFormat;
 import com.Team1_Back.domain.enums.ReportStatus;
 import com.Team1_Back.generator.ExcelReportGenerator;
 import com.Team1_Back.generator.PdfReportGenerator;
-import com.Team1_Back.repository.ReportDownloadLogRepository;
-import com.Team1_Back.repository.ReportFileRepository;
-import com.Team1_Back.repository.ReportJobRepository;
-import com.Team1_Back.repository.ReportScheduleRepository;
+import com.Team1_Back.repository.*;
+import com.Team1_Back.repository.projection.ReportQueryRepository;
 import com.Team1_Back.security.ReportPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +41,9 @@ import java.util.List;
 @Transactional
 public class ReportService {
 
+    private final ExpenseRepository expenseRepository;
+    private final ReportQueryRepository reportQueryRepository;
+
     private final ReportJobRepository reportJobRepository;
     private final PdfReportGenerator pdfGen;
     private final ExcelReportGenerator excelGen;
@@ -69,7 +71,6 @@ public class ReportService {
     // =========================
     // Public APIs
     // =========================
-
     public ReportGenerateResult generate(ReportPrincipal principal, ReportGenerateRequestDTO req) {
 
         if (principal == null) {
@@ -79,54 +80,53 @@ public class ReportService {
         return generateCore(
                 principal.userId(),
                 principal.role(),
-                principal.departmentName(),
+                principal.departmentName(), // 요청자(로그인한 사람) 부서
                 req
         );
     }
 
     public ReportGenerateResult generateInternal(ReportGenerateRequestDTO req) {
         // SYSTEM 실행 가정
-        Long systemUserId = 0L;              // 또는 -1L (정책 선택)
-        String role = "ADMIN";               // 시스템은 관리자 권한으로 실행
-        String departmentName = null;        // 필요 없으면 null
-
-
+        Long systemUserId = 0L;
+        String role = "ADMIN";
+        String departmentName = null; // 시스템 요청자 부서 스냅샷은 필요 없으면 null
 
         return generateCore(systemUserId, role, departmentName, req);
     }
 
-
     private ReportGenerateResult generateCore(
             Long requestedBy,
             String role,
-            String departmentName,
+            String requesterDepartmentName,
             ReportGenerateRequestDTO req
     ) {
-
 
         if (req == null || req.getFilters() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid request");
         }
 
+        // -------------------------
+        // 1) 타입 검증
+        // -------------------------
         String incoming = req.getReportTypeId();
         log.warn("[GEN] incoming reportTypeId='{}'", incoming);
 
-        String raw = req.getReportTypeId();
-        log.warn("[GEN] reportTypeId raw='{}'", raw);
-
-        // 1) 타입 검증
-        ReportTypes.TypeDef type = ReportTypes.find(req.getReportTypeId());
+        ReportTypes.TypeDef type = ReportTypes.find(incoming);
         if (type == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid reportTypeId");
         }
 
+        // -------------------------
         // 2) RBAC
+        // -------------------------
         boolean isAdmin = "ADMIN".equalsIgnoreCase(role);
         if (type.adminOnly() && !isAdmin) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin-only report");
         }
 
+        // -------------------------
         // 3) format 검증
+        // -------------------------
         OutputFormat expectedFormat =
                 (req.getFilters().getFormat() == null)
                         ? parseFormat(type.format())
@@ -137,19 +137,52 @@ public class ReportService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Format mismatch");
         }
 
-        // 4) scope
+        // -------------------------
+        // 4) scope 확정
+        // -------------------------
         DataScope scope = resolveScope(isAdmin, safeUpper(req.getFilters().getDataScope()));
 
+        // ✅ DEPT scope면 "조회 대상 부서"는 프론트 filters.department로 강제
+        String targetDept = null;
+        if (scope == DataScope.DEPT) {
+            targetDept = req.getFilters().getDepartment();
+            if (targetDept == null || targetDept.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Department is required for DEPT scope");
+            }
+        }
+
+        log.warn("[GEN] scope={}, requesterDept={}, targetDept(filters)={}",
+                scope, requesterDepartmentName, targetDept);
+
+        // -------------------------
         // 5) category JSON
+        // -------------------------
         String categoryJson = toJsonArray(req.getFilters().getCategory());
 
+        // -------------------------
         // 6) job 생성
+        // -------------------------
         ReportJob job = new ReportJob();
         job.setRequestedBy(requestedBy);
         job.setRoleSnapshot(role);
-        job.setDepartmentSnapshot(departmentName);
         job.setReportTypeId(type.id());
         job.setPeriod(req.getFilters().getPeriod());
+        job.setDataScope(scope);
+        job.setCategoryJson(categoryJson);
+        job.setOutputFormat(expectedFormat);
+        job.setStatus(ReportStatus.GENERATING);
+
+        // ✅ snapshot 정책
+        // - DEPT: targetDept(=filters.department)
+        // - MY: requesterDepartmentName(요청자 부서) 넣어도 되고 null이어도 됨(선택)
+        // - ALL: null 권장
+        if (scope == DataScope.DEPT) {
+            job.setDepartmentSnapshot(targetDept);
+        } else if (scope == DataScope.MY) {
+            job.setDepartmentSnapshot(requesterDepartmentName); // 선택: 남겨두면 감사로그/증빙에 좋음
+        } else {
+            job.setDepartmentSnapshot(null);
+        }
 
         LocalDate[] range = toMonthRangeOrNull(job.getPeriod());
         if (range != null) {
@@ -157,15 +190,12 @@ public class ReportService {
             job.setPeriodEnd(range[1]);
         }
 
-        job.setDataScope(scope);
-        job.setCategoryJson(categoryJson);
-        job.setOutputFormat(expectedFormat);
-        job.setStatus(ReportStatus.GENERATING);
-
         ReportJob saved = reportJobRepository.save(job);
         Long reportId = saved.getId();
 
+        // -------------------------
         // 7) 파일 경로
+        // -------------------------
         Path dir = Paths.get(
                 storagePath,
                 String.valueOf(LocalDate.now().getYear()),
@@ -186,7 +216,71 @@ public class ReportService {
         String fileName = buildFileName(saved.getPeriod(), type.id(), ext);
         Path outputFile = dir.resolve(fileName);
 
-        // 8) 생성 실행
+        // -------------------------
+        // 8) 생성 실행 직전: EXPENSE 승인 합계 리포트면 미리 계산해서 transient 값 주입
+        // -------------------------
+
+        boolean isExpenseApprovedReport =
+                ReportTypes.EXPENSE_APPROVED_SUMMARY_PDF.equals(saved.getReportTypeId()) ||
+                        ReportTypes.EXPENSE_APPROVED_SUMMARY_EXCEL.equals(saved.getReportTypeId());
+
+        log.warn("[EXP] reportTypeId(saved)={}", saved.getReportTypeId());
+        log.warn("[EXP] isExpenseApprovedReport={}", isExpenseApprovedReport);
+
+        if (isExpenseApprovedReport) {
+
+            LocalDate start = saved.getPeriodStart();
+            LocalDate end = saved.getPeriodEnd();
+
+            if (start == null || end == null) {
+                saved.setStatus(ReportStatus.FAILED);
+                saved.setErrorMessage("Period must be 'YYYY-MM' for expense approved report");
+                reportJobRepository.save(saved);
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid period format");
+            }
+
+            // ✅ LocalDate → LocalDateTime 범위로 변환 (end는 exclusive)
+            // - periodEnd가 "다음달 1일"이면 그대로 end.atStartOfDay()
+            // - periodEnd가 "그 달 마지막날"이면 +1 day 해서 exclusive로
+            LocalDateTime startDt = start.atStartOfDay();
+            LocalDateTime endDt = end.atStartOfDay();
+
+            // end가 start+1month 1일이 아니면, inclusive-end로 들어온 걸로 보고 +1day 처리
+            LocalDate firstOfNextMonth = start.withDayOfMonth(1).plusMonths(1);
+            if (!end.equals(firstOfNextMonth)) {
+                endDt = end.plusDays(1).atStartOfDay();
+            }
+
+            ApprovedAgg agg = switch (saved.getDataScope()) {
+                case ALL -> reportQueryRepository.approvedSumAll(startDt, endDt);
+
+                case MY -> reportQueryRepository.approvedSumByUser(saved.getRequestedBy(), startDt, endDt);
+
+                case DEPT -> {
+                    String dept = saved.getDepartmentSnapshot(); // ✅ DEPT면 targetDept가 들어있음
+                    if (dept == null || dept.isBlank()) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Department is required for DEPT scope");
+                    }
+                    yield reportQueryRepository.approvedSumByDept(dept.trim(), startDt, endDt);
+                }
+            };
+
+            long total = (agg == null || agg.getTotal() == null) ? 0L : agg.getTotal();
+            int count = (agg == null || agg.getCnt() == null) ? 0 : agg.getCnt().intValue();
+
+            log.warn("[EXP] scope={}, startDt={}, endDt={}, requestedBy={}, deptSnapshot={}",
+                    saved.getDataScope(), startDt, endDt, saved.getRequestedBy(), saved.getDepartmentSnapshot());
+            log.warn("[EXP] count={}, total={}", count, total);
+
+            saved.setApprovedTotal(total);
+            saved.setApprovedCount(count);
+            reportJobRepository.save(saved);
+        }
+
+
+        // -------------------------
+        // 9) 실제 파일 생성
+        // -------------------------
         try {
             if (expectedFormat == OutputFormat.PDF) {
                 pdfGen.generate(outputFile, saved);
@@ -218,6 +312,7 @@ public class ReportService {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Generate failed");
         }
     }
+
 
     @Transactional
     public DownloadResult download(ReportPrincipal principal, Long reportId) {

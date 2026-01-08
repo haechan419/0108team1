@@ -6,6 +6,7 @@ const OcrResultModal = ({ isOpen, onClose, extraction, onApply, onCancel }) => {
     extractedMerchant: "",
     extractedAmount: "",
     extractedCategory: "",
+    extractedDescription: "",
   });
 
   useEffect(() => {
@@ -15,6 +16,7 @@ const OcrResultModal = ({ isOpen, onClose, extraction, onApply, onCancel }) => {
         extractedMerchant: extraction.extractedMerchant || "",
         extractedAmount: extraction.extractedAmount || "",
         extractedCategory: extraction.extractedCategory || "",
+        extractedDescription: extraction.extractedDescription || "",
       });
     }
   }, [extraction]);
@@ -35,6 +37,7 @@ const OcrResultModal = ({ isOpen, onClose, extraction, onApply, onCancel }) => {
         ...extraction,
         ...editableData,
         extractedAmount: editableData.extractedAmount ? parseInt(editableData.extractedAmount) : null,
+        extractedDescription: editableData.extractedDescription || null,
       };
       onApply(modifiedExtraction);
     }
@@ -118,6 +121,16 @@ const OcrResultModal = ({ isOpen, onClose, extraction, onApply, onCancel }) => {
                       <option value="기타">기타</option>
                     </select>
                   </div>
+                </div>
+                <div className="mt-4">
+                  <label className="block text-sm font-medium mb-1">상세내용</label>
+                  <textarea
+                    className="w-full p-2 border border-gray-300 rounded"
+                    value={editableData.extractedDescription || ""}
+                    onChange={(e) => handleChange("extractedDescription", e.target.value)}
+                    placeholder="구매한 상품명 목록을 입력하세요"
+                    rows={3}
+                  />
                 </div>
               </div>
 

@@ -56,17 +56,13 @@ public class ExpenseController {
             PageRequestDTO pageRequestDTO,
             @AuthenticationPrincipal UserDTO principal) {
 
-        // 인증 체크
         if (principal == null) {
             log.error("principal이 null입니다. 인증이 필요합니다.");
             throw new RuntimeException("인증이 필요합니다.");
         }
 
         Long userId = principal.getId();
-        log.info("지출 목록 조회 요청 - userId: " + userId + ", status: " + status + ", startDate: " + startDate + ", endDate: " + endDate);
-        PageResponseDTO<ExpenseDTO> response = expenseService.getList(userId, pageRequestDTO, status, startDate, endDate);
-        log.info("지출 목록 조회 결과 - 총 " + response.getContent().size() + "건");
-        return response;
+        return expenseService.getList(userId, pageRequestDTO, status, startDate, endDate);
     }
 
     /**
@@ -83,14 +79,12 @@ public class ExpenseController {
      */
     @GetMapping("/{id}")
     public ExpenseDTO get(@PathVariable(name="id") Long id, @AuthenticationPrincipal UserDTO principal) {
-        // 인증 체크
         if (principal == null) {
             log.error("principal이 null입니다. 인증이 필요합니다.");
             throw new RuntimeException("인증이 필요합니다.");
         }
         
         Long userId = principal.getId();
-        // 관리자 여부 확인 (관리자는 모든 지출 내역 조회 가능)
         boolean isAdmin = userService.isAdmin(userId);
         
         return expenseService.get(id, userId, isAdmin);

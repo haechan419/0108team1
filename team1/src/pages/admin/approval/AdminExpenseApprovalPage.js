@@ -5,20 +5,25 @@ import {
   createSearchParams,
 } from "react-router-dom";
 import { getExpenseApprovals } from "../../../api/approvalApi";
-import { expenseApi } from "../../../api/expenseApi";
 import "./AdminExpenseApprovalPage.css";
 import AppLayout from "../../../components/layout/AppLayout";
 
+/**
+ * 지출 결재 관리 페이지 컴포넌트
+ * 
+ * 관리자가 제출된 지출 내역을 검토하고 승인/반려 처리를 할 수 있는 페이지입니다.
+ * 
+ * @component
+ */
 const AdminExpenseApprovalPage = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [approvalRequests, setApprovalRequests] = useState([]);
-  const [expensesMap, setExpensesMap] = useState({}); // refId -> Expense 매핑
-  const [hasReceiptMap, setHasReceiptMap] = useState({}); // refId -> 영수증 유무
+  const [expensesMap, setExpensesMap] = useState({});
+  const [hasReceiptMap, setHasReceiptMap] = useState({});
   const [pageResponse, setPageResponse] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // URL 쿼리 파라미터에서 초기값 읽기 (mall 패턴)
   const [currentPage, setCurrentPage] = useState(() => {
     const page = parseInt(searchParams.get("page") || "1", 10);
     return isNaN(page) || page < 1 ? 1 : page;
@@ -33,7 +38,6 @@ const AdminExpenseApprovalPage = () => {
     () => searchParams.get("endDate") || ""
   );
 
-  // URL 쿼리 파라미터 동기화
   useEffect(() => {
     const params = new URLSearchParams();
     if (currentPage > 1) params.set("page", currentPage.toString());
@@ -48,7 +52,6 @@ const AdminExpenseApprovalPage = () => {
     }
   }, [currentPage, statusFilter, startDate, endDate, setSearchParams]);
 
-  // 필터 변경 시 첫 페이지로 리셋 (URL 동기화와 분리)
   const prevFilters = useRef({ statusFilter, startDate, endDate });
   useEffect(() => {
     const prev = prevFilters.current;
@@ -67,6 +70,12 @@ const AdminExpenseApprovalPage = () => {
     loadApprovalRequests();
   }, [currentPage, statusFilter, startDate, endDate]);
 
+  /**
+   * 결재 요청 목록 조회
+   * 
+   * 백엔드에서 이미 expense 정보를 포함하여 반환하므로 개별 API 호출이 불필요합니다.
+   * ApprovalServiceImpl에서 getByIds로 한번에 조회하여 포함시킵니다.
+   */
   const loadApprovalRequests = async () => {
     setLoading(true);
     try {
@@ -78,36 +87,26 @@ const AdminExpenseApprovalPage = () => {
         endDate: endDate || undefined,
       };
       const response = await getExpenseApprovals(params);
-      // 백엔드에서 이미 DRAFT를 제외하므로 프론트 필터링 불필요
-      // REQUEST_MORE_INFO 상태는 프론트엔드에서 필터링하여 표시하지 않음
       const requests = (response.content || []).filter(
         (request) => request.statusSnapshot !== "REQUEST_MORE_INFO"
       );
       setApprovalRequests(requests);
       setPageResponse(response);
 
-      // 각 ApprovalRequest의 refId로 Expense 정보 조회 및 영수증 유무 확인
       const expenses = {};
       const hasReceipt = {};
       for (const request of requests) {
-        if (request.refId) {
-          try {
-            const expenseResponse = await expenseApi.getExpense(request.refId);
-            expenses[request.refId] = expenseResponse.data;
-
-            // 영수증 유무 확인
-            if (expenseResponse.data.receiptId) {
-              hasReceipt[request.refId] = true;
-            } else {
-              hasReceipt[request.refId] = false;
-            }
-          } catch (error) {
-            console.error(
-              `지출 내역 조회 실패 (refId: ${request.refId}):`,
-              error
-            );
+        if (request.refId && request.expense) {
+          expenses[request.refId] = request.expense;
+          
+          const expenseData = request.expense;
+          if (expenseData.hasReceipt === true || (expenseData.receiptId && expenseData.receiptId > 0)) {
+            hasReceipt[request.refId] = true;
+          } else {
             hasReceipt[request.refId] = false;
           }
+        } else if (request.refId) {
+          hasReceipt[request.refId] = false;
         }
       }
       setExpensesMap(expenses);
@@ -115,7 +114,6 @@ const AdminExpenseApprovalPage = () => {
     } catch (error) {
       console.error("결재 목록 조회 실패:", error);
 
-      // 403 Forbidden 에러 처리 (관리자 권한 없음)
       if (error.response?.status === 403) {
         alert("관리자 권한이 필요합니다.");
         navigate("/receipt/expenses");
@@ -140,8 +138,12 @@ const AdminExpenseApprovalPage = () => {
     loadApprovalRequests();
   };
 
+  /**
+   * 결재 요청 클릭 핸들러
+   * 
+   * @param {Object} approvalRequest - 클릭된 결재 요청 객체
+   */
   const handleApprovalClick = (approvalRequest) => {
-    // URL 쿼리 파라미터를 포함하여 상세 페이지로 이동 (mall 패턴)
     const params = createSearchParams({
       page: currentPage.toString(),
       ...(statusFilter && { status: statusFilter }),
@@ -151,8 +153,13 @@ const AdminExpenseApprovalPage = () => {
     navigate(`/admin/approval/${approvalRequest.id}?${params.toString()}`);
   };
 
+  /**
+   * 상태 라벨 반환
+   * 
+   * @param {string} status - 승인 상태
+   * @returns {string} 상태 라벨
+   */
   const getStatusLabel = (status) => {
-    // REQUEST_MORE_INFO 상태는 표시하지 않음
     if (status === "REQUEST_MORE_INFO") {
       return "";
     }
@@ -193,7 +200,6 @@ const AdminExpenseApprovalPage = () => {
           </p>
         </div>
 
-        {/* Filter Section */}
         <div className="filter-section">
           <div className="filter-row">
             <div className="filter-item">
@@ -235,7 +241,6 @@ const AdminExpenseApprovalPage = () => {
           </div>
         </div>
 
-        {/* Table Section */}
         <div className="table-container">
           {loading ? (
             <div className="loading">로딩 중...</div>
@@ -259,7 +264,6 @@ const AdminExpenseApprovalPage = () => {
                   {approvalRequests.map((request, index) => {
                     const expense = expensesMap[request.refId];
                     const hasReceipt = hasReceiptMap[request.refId];
-                    // DRAFT 상태의 Expense는 ApprovalRequest가 없어서 id가 null일 수 있음
                     const uniqueKey =
                       request.id ||
                       `draft-${request.refId}` ||
@@ -311,7 +315,6 @@ const AdminExpenseApprovalPage = () => {
                 </tbody>
               </table>
 
-              {/* Pagination */}
               {pageResponse &&
                 pageResponse.pageNumList &&
                 Array.isArray(pageResponse.pageNumList) &&

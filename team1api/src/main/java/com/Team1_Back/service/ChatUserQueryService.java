@@ -18,8 +18,7 @@ public class ChatUserQueryService {
         String keyword = (q == null) ? "" : q.trim();
         int lim = (limit == null) ? 20 : Math.min(Math.max(limit, 1), 50);
 
-        if (keyword.isEmpty())
-            return List.of();
+        if (keyword.isEmpty()) return List.of();
 
         List<UserSearchRow> rows = userRepository.searchUsers(meId, keyword, lim);
         return rows.stream()
@@ -27,7 +26,9 @@ public class ChatUserQueryService {
                         r.getUserId(),
                         r.getName(),
                         r.getEmployeeNo(),
-                        r.getDepartmentName()))
+                        r.getDepartmentName()
+                ))
                 .toList();
     }
 }
+
