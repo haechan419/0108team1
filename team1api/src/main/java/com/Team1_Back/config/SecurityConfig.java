@@ -56,15 +56,14 @@ public class SecurityConfig {
         //  1) 기존 정책 (API용) - 너가 원한대로 그대로 유지
         CorsConfiguration apiConfig = new CorsConfiguration();
         apiConfig.setAllowedOrigins(List.of("http://localhost:3000"));
-        apiConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        apiConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         apiConfig.setAllowedHeaders(List.of(
                 "Content-Type",
                 "Authorization",
                 "Cache-Control",
                 "X-User-Id",
                 "X-Role",
-                "X-Dept"
-        ));
+                "X-Dept"));
         apiConfig.setExposedHeaders(List.of("Content-Disposition"));
         apiConfig.setAllowCredentials(false); // ✅ 그대로 유지
 
@@ -90,6 +89,8 @@ public class SecurityConfig {
     }
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+
+        log.info("--------------------- security config (JWT + API no-redirect) ---------------------");
 
         http
                 .csrf(csrf -> csrf.disable())
@@ -135,6 +136,8 @@ public class SecurityConfig {
                         })
                 )
                 .httpBasic(basic -> basic.disable());
+
+        http.addFilterBefore(jwtCheckFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

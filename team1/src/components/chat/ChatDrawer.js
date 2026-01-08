@@ -3,7 +3,7 @@ import ChatPanel from "./ChatPanel";
 import NewChatModal from "./NewChatModal";
 import "../../styles/chatDrawer.css";
 
-import { getAuthTokenForRequest } from "../../api/axiosInstance"; // ✅ 추가
+import { getAuthTokenForRequest } from "../../util/jwtUtil"; // ✅ 추가
 import { connectChatSocket, subscribeRooms } from "../../ws/chatSocket";
 
 export default function ChatDrawer({
