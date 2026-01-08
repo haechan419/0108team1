@@ -62,6 +62,13 @@ const UserEditPage = () => {
     setLoading(true);
     try {
       const response = await getUser(id);
+      console.log("사원 정보 응답:", response);
+      console.log("role 값:", response.role);
+
+      // ✅ role이 없으면 기본값 "USER" 설정 (하지만 백엔드에서 반환해야 함)
+      const userRole = response.role || "USER";
+      console.log("설정할 role:", userRole);
+
       setFormData({
         employeeNo: response.employeeNo || "",
         name: response.name || "",
@@ -72,7 +79,7 @@ const UserEditPage = () => {
         addressDetail: response.addressDetail || "",
         departmentName: response.departmentName || "",
         position: response.positionName || "",
-        role: response.role || "USER",
+        role: userRole,
         newPassword: "",
       });
       setIsLocked(response.locked || false);

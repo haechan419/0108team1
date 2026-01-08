@@ -34,6 +34,7 @@ import UserEditPage from "./pages/admin/hr/UserEditPage";
 
 // ✅ 날아다니는 AI 버튼 (FloatingAI 컴포넌트)
 import FloatingAI from "./pages/FloatingAI";
+import { FloatingAIProvider } from "./context/FloatingAIContext";
 import MypagePage from "./pages/mypage/MypagePage";
 import AdminShopPage from "./pages/admin/shop/AdminShopPage";
 import AdminApprovalPage from "./pages/admin/AdminApprovalPage";
@@ -55,7 +56,7 @@ function AppInner() {
     const showFloatingAI = isLogin && location.pathname !== "/";
 
     return (
-        <>
+        <FloatingAIProvider>
             {/* 페이지 라우팅 */}
             <Routes>
 
@@ -141,8 +142,8 @@ function AppInner() {
             </Routes>
 
             {/* ✅ 로그인 후에만, 전체 페이지에서 항상 떠있게 */}
-            {showFloatingAI && <FloatingAI/>}
-        </>
+            {showFloatingAI && <FloatingAI />}
+        </FloatingAIProvider>
     );
 }
 

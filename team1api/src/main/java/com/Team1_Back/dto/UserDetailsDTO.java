@@ -22,6 +22,7 @@ public class UserDetailsDTO {
     private String addressDetail;
     private String departmentName;
     private String positionName;
+    private String role; // 권한 (USER, ADMIN)
     private boolean isLocked;
     private boolean isActive;
     private LocalDateTime createdUserAt;

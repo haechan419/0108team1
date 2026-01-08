@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import useCustomLogin from "../../hooks/useCustomLogin";
+import { useFloatingAI } from "../../context/FloatingAIContext";
 import "../../styles/layout.css";
 import NotificationBell from "../common/NotificationBell";
 import ChatDrawer from "../chat/ChatDrawer";
@@ -9,6 +10,7 @@ import { chatApi } from "../../api/chatApi";
 export default function Topbar() {
     const navigate = useNavigate();
     const { loginState, doLogout } = useCustomLogin();
+    const { setOpen: openAI } = useFloatingAI();
 
     const [chatOpen, setChatOpen] = useState(false);
     const [activeRoomId, setActiveRoomId] = useState(null);
@@ -64,11 +66,39 @@ export default function Topbar() {
     return (
         <>
             <header className="topbar">
-                <div className="topbar-left"></div>
+                <div className="topbar-left">
+                    <button
+                        className="ai-topbar-btn"
+                        onClick={() => openAI(true)}
+                        aria-label="Open AI assistant"
+                        title="AI Assistant"
+                        type="button"
+                    >
+                        AI
+                    </button>
+                </div>
+
 
                 <div className="topbar-right">
                     <div className="user-profile">
-                        <div className="avatar-circle"></div>
+                        <div className="avatar-circle">
+
+                            {loginState?.thumbnailUrl || loginState?.profileImageUrl ? (
+                                <img
+                                    src={`http://localhost:8080${loginState.thumbnailUrl || loginState.profileImageUrl
+                                        }`}
+                                    alt="프로필 이미지"
+                                    style={{
+                                        width: "100%",
+                                        height: "100%",
+                                        objectFit: "cover",
+                                    }}
+                                />
+                            ) : (
+                                <span style={{ fontSize: "18px" }}>👤</span>
+                            )}
+
+                        </div>
                         <div className="user-info">
                             <div className="user-name">{loginState.name || "사용자"}님</div>
                             <div className="user-dept">{loginState.departmentName || "부서없음"}</div>
