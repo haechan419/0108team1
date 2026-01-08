@@ -67,8 +67,8 @@
 }
 
 .status-badge.status-submitted {
-  background-color: transparent;
-  color: inherit;
+  background-color: #dbeafe;
+  color: #1e40af;
 }
 
 .status-badge.status-approved {
@@ -79,6 +79,11 @@
 .status-badge.status-rejected {
   background-color: #fee2e2;
   color: #991b1b;
+}
+
+.status-badge.status-request-more-info {
+  background-color: #fef3c7;
+  color: #92400e;
 }
 
 .amount-cell {

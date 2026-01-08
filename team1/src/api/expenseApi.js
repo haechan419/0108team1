@@ -1,28 +1,28 @@
-import jwtAxios from "../util/jwtUtil";
+import axiosInstance from "./axiosInstance";
 
 export const expenseApi = {
   getExpenses: (params) => {
-    return jwtAxios.get("/receipt/expenses/list", { params });
+    return axiosInstance.get("/receipt/expenses/list", { params });
   },
 
   getExpense: (id) => {
-    return jwtAxios.get(`/receipt/expenses/${id}`);
+    return axiosInstance.get(`/receipt/expenses/${id}`);
   },
 
   createExpense: (data) => {
-    return jwtAxios.post("/receipt/expenses/", data);
+    return axiosInstance.post("/receipt/expenses/", data);
   },
 
   updateExpense: (id, data) => {
-    return jwtAxios.put(`/receipt/expenses/${id}`, data);
+    return axiosInstance.put(`/receipt/expenses/${id}`, data);
   },
 
   deleteExpense: (id) => {
-    return jwtAxios.delete(`/receipt/expenses/${id}`);
+    return axiosInstance.delete(`/receipt/expenses/${id}`);
   },
 
   submitExpense: (id, data) => {
-    return jwtAxios.post(`/receipt/expenses/${id}/submit`, data);
+    return axiosInstance.post(`/receipt/expenses/${id}/submit`, data);
   },
 };
 

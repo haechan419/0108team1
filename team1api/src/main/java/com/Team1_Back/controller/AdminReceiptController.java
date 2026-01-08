@@ -70,7 +70,7 @@ public class AdminReceiptController {
         
         log.info("관리자 영수증 목록 조회 요청 - status: " + status + ", approverId: " + approverId);
         PageResponseDTO<ReceiptDTO> response = adminReceiptService.getList(pageRequestDTO, status, approverId);
-        log.info("관리자 영수증 목록 조회 결과 - 총 " + response.getContent().size() + "건");
+        log.info("관리자 영수증 목록 조회 결과 - 총 " + response.getDtoList().size() + "건");
         return response;
     }
 

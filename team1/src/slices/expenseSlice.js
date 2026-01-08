@@ -68,8 +68,8 @@ const expenseSlice = createSlice({
       .addCase(fetchExpenses.fulfilled, (state, action) => {
         state.loading = false;
         console.log("✅ 지출 목록 조회 성공:", action.payload);
-        console.log("📊 조회된 지출 내역 수:", action.payload.content?.length || 0);
-        state.expenses = action.payload.content || [];
+        console.log("📊 조회된 지출 내역 수:", action.payload.dtoList?.length || 0);
+        state.expenses = action.payload.dtoList || [];
         state.pageResponse = action.payload;
       })
       .addCase(fetchExpenses.rejected, (state, action) => {

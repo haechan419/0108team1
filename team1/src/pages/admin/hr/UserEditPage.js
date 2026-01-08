@@ -7,7 +7,6 @@ import {
   resignUser,
 } from "../../../api/adminUserApi";
 import AppLayout from "../../../components/layout/AppLayout";
-import ProfileImageUpload from "../../../components/admin/hr/ProfileImageUpload";
 import "./UserEditPage.css";
 
 const UserEditPage = () => {
@@ -32,7 +31,6 @@ const UserEditPage = () => {
   // 상태값 (읽기 전용)
   const [isLocked, setIsLocked] = useState(false);
   const [isActive, setIsActive] = useState(true);
-  const [thumbnailUrl, setThumbnailUrl] = useState(null);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -77,7 +75,6 @@ const UserEditPage = () => {
       });
       setIsLocked(response.locked || false);
       setIsActive(response.active !== false);
-      setThumbnailUrl(response.thumbnailUrl || null);
     } catch (error) {
       console.error("사원 정보 조회 실패:", error);
       alert("사원 정보를 불러올 수 없습니다.");
@@ -161,15 +158,6 @@ const UserEditPage = () => {
     }
   };
 
-  // 이미지 변경 핸들러
-  const handleImageChange = (result) => {
-    if (result && result.thumbnailUrl) {
-      setThumbnailUrl(result.thumbnailUrl);
-    } else {
-      setThumbnailUrl(null);
-    }
-  };
-
   if (loading) {
     return (
       <AppLayout>
@@ -187,11 +175,13 @@ const UserEditPage = () => {
         <div className="top-section">
           {/* 왼쪽: 사진 업로드 영역 */}
           <div className="photo-section">
-            <ProfileImageUpload 
-              userId={parseInt(id)}
-              thumbnailUrl={thumbnailUrl}
-              onImageChange={handleImageChange}
-            />
+            <h3 className="section-title">사진업로드(증명사진)</h3>
+            <div className="photo-placeholder">
+              <span>사진 없음</span>
+            </div>
+            <button type="button" className="btn btn-outline">
+              파일 업로드
+            </button>
           </div>
 
           {/* 오른쪽: 직원 정보 */}
