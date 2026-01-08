@@ -52,61 +52,53 @@ public class SecurityConfig {
     @Bean
     @Order(HIGHEST_PRECEDENCE)
     public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
 
-        //  1) 기존 정책 (API용) - 너가 원한대로 그대로 유지
-        CorsConfiguration apiConfig = new CorsConfiguration();
-        apiConfig.setAllowedOrigins(List.of("http://localhost:3000"));
-        apiConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        apiConfig.setAllowedHeaders(List.of(
+        config.setAllowedOrigins(List.of("http://localhost:3000"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of(
                 "Content-Type",
                 "Authorization",
                 "Cache-Control",
                 "X-User-Id",
                 "X-Role",
-                "X-Dept"
-        ));
-        apiConfig.setExposedHeaders(List.of("Content-Disposition"));
-        apiConfig.setAllowCredentials(false); // ✅ 그대로 유지
+                "X-Dept"));
+        config.setExposedHeaders(List.of("Content-Disposition"));
 
-        //  2) SockJS(WebSocket) 전용 정책 - 여기만 credentials 허용
-        CorsConfiguration wsConfig = new CorsConfiguration();
-        wsConfig.setAllowedOrigins(List.of("http://localhost:3000"));
-        wsConfig.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
-
-        // SockJS가 /info 등에서 여러 헤더를 쓸 수 있어서
-        // 최소한 Authorization은 포함, 나머지는 필요하면 추가
-        wsConfig.setAllowedHeaders(List.of("Content-Type", "Authorization"));
-        wsConfig.setAllowCredentials(true); // ✅ 여기만 true
+        config.setAllowCredentials(false);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-
-        //  더 구체적인 /ws-chat/** 를 먼저 등록 (우선 적용)
-        source.registerCorsConfiguration("/ws-chat/**", wsConfig);
-
-        //  나머지는 기존 정책 적용
-        source.registerCorsConfiguration("/**", apiConfig);
-
+        source.registerCorsConfiguration("/**", config);
         return source;
     }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+
+        log.info("--------------------- security config (JWT + API no-redirect) ---------------------");
 
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+                // ✅ JWT 기반이면 stateless
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // ✅ 여기 딱 1번만
-                .addFilterBefore(jwtCheckFilter(), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new JWTCheckFilter(), UsernamePasswordAuthenticationFilter.class)
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/reports/**").authenticated()
-                        .anyRequest().permitAll()
-                )
 
+                        // ✅ 관리자 전용
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
+                        // ✅ 로그인 필요
+                        .requestMatchers("/api/reports/**").authenticated()
+
+                        .anyRequest().permitAll())
+
+                // ✅ API는 리다이렉트 금지: 무조건 401 JSON
                 .exceptionHandling(e -> e
                         .defaultAuthenticationEntryPointFor(
                                 (request, response, authException) -> {
@@ -114,17 +106,15 @@ public class SecurityConfig {
                                     response.setContentType("application/json; charset=UTF-8");
                                     response.getWriter().write("{\"success\":false,\"message\":\"UNAUTHORIZED\"}");
                                 },
-                                new AntPathRequestMatcher("/api/**")
-                        )
-                )
+                                new AntPathRequestMatcher("/api/**")))
 
+                // ✅ 로그인은 처리 URL만 사용 (페이지 렌더링 X)
                 .formLogin(form -> form
                         .loginProcessingUrl("/api/auth/login")
                         .usernameParameter("employeeNo")
                         .passwordParameter("password")
                         .successHandler(new APILoginSuccessHandler(eventPublisher))
-                        .failureHandler(new APILoginFailHandler(eventPublisher))
-                )
+                        .failureHandler(new APILoginFailHandler(eventPublisher)))
 
                 .logout(logout -> logout
                         .logoutUrl("/api/auth/logout")
@@ -132,11 +122,13 @@ public class SecurityConfig {
                             response.setStatus(200);
                             response.setContentType("application/json; charset=UTF-8");
                             response.getWriter().write("{\"success\":true,\"message\":\"로그아웃 성공\"}");
-                        })
-                )
+                        }))
+
                 .httpBasic(basic -> basic.disable());
+
+        // ✅ JWT 필터 등록
+        http.addFilterBefore(jwtCheckFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
-
 }

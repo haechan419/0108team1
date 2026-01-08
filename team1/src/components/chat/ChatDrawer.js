@@ -3,29 +3,17 @@ import ChatPanel from "./ChatPanel";
 import NewChatModal from "./NewChatModal";
 import "../../styles/chatDrawer.css";
 
-import { getAuthTokenForRequest } from "../../api/axiosInstance"; // ✅ 추가
-import { connectChatSocket, subscribeRooms } from "../../ws/chatSocket";
-
 export default function ChatDrawer({
-                                       open, onClose, roomId, onChangeRoom, autoOpenNewChat, onRoomsChanged,
+                                       open,
+                                       onClose,
+                                       roomId,
+                                       onChangeRoom,
+                                       autoOpenNewChat,     // ✅ 추가
+                                       onRoomsChanged,      // ✅ (선택) 방 생성/삭제 후 Topbar 갱신 콜백
                                    }) {
     const [newChatOpen, setNewChatOpen] = useState(false);
 
-    useEffect(() => {
-        if (!open) return;
-
-        const jwt = getAuthTokenForRequest();
-        console.log("🧷 ChatDrawer open -> connect socket. jwt?", Boolean(jwt));
-
-        connectChatSocket(jwt, (ping) => console.log("🏓 ping", ping));
-
-        subscribeRooms((evt) => {
-            console.log("📩 rooms event", evt);
-            // onRoomsChanged?.(); // 필요하면 켜
-        });
-    }, [open, onRoomsChanged]);
-
-    // (나머지 기존 코드 그대로)
+    // ✅ autoOpenNewChat가 true면 모달 강제 오픈
     useEffect(() => {
         if (!open) return;
         if (autoOpenNewChat) setNewChatOpen(true);
@@ -33,6 +21,7 @@ export default function ChatDrawer({
 
     useEffect(() => {
         if (!open) return;
+
         const onKeyDown = (e) => {
             if (e.key === "Escape") {
                 if (newChatOpen) setNewChatOpen(false);
@@ -48,7 +37,7 @@ export default function ChatDrawer({
             console.log("[DRAWER] onCreated roomId=", createdRoomId);
             onChangeRoom?.(createdRoomId);
             setNewChatOpen(false);
-            onRoomsChanged?.();
+            onRoomsChanged?.(); // ✅ 상단 rooms도 갱신
         },
         [onChangeRoom, onRoomsChanged]
     );
@@ -60,17 +49,36 @@ export default function ChatDrawer({
             <div className="chatDrawer" onMouseDown={(e) => e.stopPropagation()}>
                 <div className="chatDrawerHeader">
                     <div className="chatDrawerTitle">Chat</div>
+
                     <div className="chatDrawerActions">
-                        <button className="chatNewBtn" onClick={() => setNewChatOpen(true)} title="새 채팅" type="button">＋</button>
-                        <button className="chatCloseBtn" onClick={onClose} aria-label="Close chat" type="button">✕</button>
+                        <button
+                            className="chatNewBtn"
+                            onClick={() => setNewChatOpen(true)}
+                            title="새 채팅"
+                            type="button"
+                        >
+                            ＋
+                        </button>
+
+                        <button className="chatCloseBtn" onClick={onClose} aria-label="Close chat" type="button">
+                            ✕
+                        </button>
                     </div>
                 </div>
 
                 <div className="chatDrawerBody">
-                    {roomId ? <ChatPanel key={roomId} roomId={roomId} /> : <div className="chatEmpty">대화를 선택하거나 새 채팅을 시작하세요</div>}
+                    {roomId ? (
+                        <ChatPanel key={roomId} roomId={roomId} />
+                    ) : (
+                        <div className="chatEmpty">대화를 선택하거나 새 채팅을 시작하세요</div>
+                    )}
                 </div>
 
-                <NewChatModal open={newChatOpen} onClose={() => setNewChatOpen(false)} onCreated={handleCreated} />
+                <NewChatModal
+                    open={newChatOpen}
+                    onClose={() => setNewChatOpen(false)}
+                    onCreated={handleCreated}
+                />
             </div>
         </div>
     );

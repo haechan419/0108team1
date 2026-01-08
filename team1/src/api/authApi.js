@@ -5,12 +5,12 @@ export const API_SERVER_HOST = "http://localhost:8080";
 
 // axios 인스턴스 생성
 const apiClient = axios.create({
-    baseURL: API_SERVER_HOST,
-    withCredentials: false,
-    headers: {
-        // ⭐ Spring Security formLogin은 form-urlencoded 형식을 기대함!
-        "Content-Type": "application/x-www-form-urlencoded",
-    },
+  baseURL: API_SERVER_HOST,
+  withCredentials: false,
+  headers: {
+    // ⭐ Spring Security formLogin은 form-urlencoded 형식을 기대함!
+    "Content-Type": "application/x-www-form-urlencoded",
+  },
 });
 
 /**
@@ -20,24 +20,24 @@ const apiClient = axios.create({
  * @returns {Promise} axios response
  */
 export const login = async (employeeNo, password) => {
-    // ⭐ URLSearchParams로 form 데이터 생성
-    const params = new URLSearchParams();
-    params.append("employeeNo", employeeNo);
-    params.append("password", password);
+  // ⭐ URLSearchParams로 form 데이터 생성
+  const params = new URLSearchParams();
+  params.append("employeeNo", employeeNo);
+  params.append("password", password);
 
-    const response = await apiClient.post("/api/auth/login", params);
-    return response;
+  const response = await apiClient.post("/api/auth/login", params);
+  return response;
 };
 
 /**
  * 로그아웃 API
  */
 export const logoutApi = async () => {
-    const response = await apiClient.post("/api/auth/logout");
-    return response;
+  const response = await apiClient.post("/api/auth/logout");
+  return response;
 };
 
 export default {
-    login,
-    logoutApi,
+  login,
+  logoutApi,
 };

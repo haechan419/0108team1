@@ -1,11 +1,10 @@
-
 import { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 
 import AppLayout from "../../components/layout/AppLayout";
 import "../../styles/report.css";
 import { REPORT_TYPES } from "../../constants/reportTypes";
-import axiosInstance from "../../api/axiosInstance"; // ✅ 경로 맞춰줘 (네 프로젝트 기준)
+import jwtAxios from "../../util/jwtUtil";
 
 export default function ReportAnalyticsPage() {
     // ✅ 링크(a href)용: 파일 다운로드를 새 탭으로 열 때만 사용
@@ -36,14 +35,9 @@ export default function ReportAnalyticsPage() {
     }, [loginState]);
 
     // ADMIN: /admin/report-schedules
-// USER : /report-schedules
+    // USER : /report-schedules
     const SCHEDULE_BASE = role === "ADMIN" ? "/admin/report-schedules" : "/report-schedules";
-    const [departments, setDepartments] = useState([]);
-    const [dept, setDept] = useState(""); // 선택된 부서명
 
-
-    const [approvedTotal, setApprovedTotal] = useState(null);
-    const [approvedCount, setApprovedCount] = useState(null);
 
 
     // ✅ 실제로는 로그인 훅/스토어에서 role 받아오면 됨
@@ -100,7 +94,7 @@ export default function ReportAnalyticsPage() {
     const fetchSchedules = async () => {
         try {
             setIsSchedulesLoading(true);
-            const res = await axiosInstance.get(SCHEDULE_BASE);
+            const res = await jwtAxios.get(SCHEDULE_BASE);
             const data = res.data;
             setSchedules(data?.items ?? (Array.isArray(data) ? data : []));
         } catch (e) {
@@ -112,17 +106,17 @@ export default function ReportAnalyticsPage() {
     };
 
     const createSchedule = async (payload) => {
-        const res = await axiosInstance.post(SCHEDULE_BASE, payload);
+        const res = await jwtAxios.post(SCHEDULE_BASE, payload);
         return res.data;
     };
 
     const updateSchedule = async (id, payload) => {
-        const res = await axiosInstance.put(`${SCHEDULE_BASE}/${id}`, payload);
+        const res = await jwtAxios.put(`${SCHEDULE_BASE}/${id}`, payload);
         return res.data;
     };
 
     const runScheduleNow = async (id) => {
-        const res = await axiosInstance.post(`${SCHEDULE_BASE}/${id}/run`);
+        const res = await jwtAxios.post(`${SCHEDULE_BASE}/${id}/run`);
         return res.data;
     };
 
@@ -150,15 +144,15 @@ export default function ReportAnalyticsPage() {
     // -------------------------
     const FILTERS = useMemo(
         () => [
-            { key: "period", label: "기간", type: "single", options: PERIOD_OPTIONS },
-            { key: "scope", label: "범위", type: "single", options: scopeOptions },
+            { key: "period", label: "Period", type: "single", options: PERIOD_OPTIONS },
+            { key: "scope", label: "Data Scope", type: "single", options: scopeOptions },
             {
                 key: "category",
-                label: "카데고리",
+                label: "Category",
                 type: "multi",
                 options: ["All", "Meals", "Supplies", "Taxi", "Other"],
             },
-            { key: "format", label: "형식", type: "single", options: ["PDF", "EXCEL"] },
+            { key: "format", label: "Format", type: "single", options: ["PDF", "EXCEL"] },
         ],
         [scopeOptions]
     );
@@ -181,30 +175,9 @@ export default function ReportAnalyticsPage() {
     const [selected, setSelected] = useState(getDefaultSelected());
 
     useEffect(() => {
-        if (role === "ADMIN")   fetchSchedules();
+        if (role === "ADMIN") fetchSchedules();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [role]);
-
-    useEffect(() => {
-        const isDeptMode = role === "ADMIN" && selected.scope?.[0] === "Department";
-
-        if (!isDeptMode) {
-            setDept("");          // ✅ Department 모드 아니면 선택값 제거
-            return;
-        }
-
-        (async () => {
-            try {
-                const res = await axiosInstance.get("/admin/departments");
-                const list = Array.isArray(res.data) ? res.data : (res.data?.items ?? []);
-                setDepartments(list);
-            } catch (e) {
-                console.error(e);
-                setDepartments([]);
-            }
-        })();
-    }, [role, selected.scope]);
-
 
     useEffect(() => {
         if (role !== "ADMIN") setSelected((p) => ({ ...p, scope: ["My Data"] }));
@@ -380,46 +353,32 @@ export default function ReportAnalyticsPage() {
     // API: Generate
     // -------------------------
     const handleGenerate = async () => {
+
         try {
             setIsGenerating(true);
 
-            setApprovedTotal(null);
-            setApprovedCount(null);
-
             const uiScope = selected.scope?.[0] ?? (role === "ADMIN" ? "Department" : "My Data");
-            const dataScope = SCOPE_MAP[uiScope] ?? (role === "ADMIN" ? "DEPT" : "MY");
-
-            // ✅ ADMIN + DEPT면 부서 선택 강제
-            if (role === "ADMIN" && dataScope === "DEPT" && !dept) {
-                return alert("부서를 선택하세요.");
-            }
+            const uiFormat = selected.format?.[0] ?? "PDF";
+            const format = uiFormat.trim().toUpperCase() === "EXCEL" ? "EXCEL" : "PDF";
 
             const payload = {
                 reportTypeId,
                 filters: {
                     period: selected.period?.[0] ?? null,
-                    dataScope,
-
+                    dataScope: SCOPE_MAP[uiScope] ?? (role === "ADMIN" ? "DEPT" : "MY"),
                     category: selected.category?.length ? selected.category : ["ALL"],
                     format: effectiveFormat,
-
-                    // ✅ 여기 박는거임
-                    departmentName: role === "ADMIN" && dataScope === "DEPT" ? dept : null,
                 },
             };
-
             console.log("[GEN payload]", payload);
 
-            const res = await axiosInstance.post("/reports/generate", payload);
+
+            const res = await jwtAxios.post("/reports/generate", payload);
             const data = res.data;
 
             setGeneratedReportId(data.reportId);
             setIsGenerated(true);
             setLogsMode({ type: "REPORT", fileId: null });
-
-            // ✅ 추가: 백엔드가 내려준 승인 합계 표시용
-            setApprovedTotal(data.approvedTotal ?? null);
-            setApprovedCount(data.approvedCount ?? null);
         } catch (e) {
             console.error(e);
             alert("Generate failed");
@@ -442,7 +401,7 @@ export default function ReportAnalyticsPage() {
         (async () => {
             try {
                 setIsFilesLoading(true);
-                const res = await axiosInstance.get(`/reports/${generatedReportId}/files`);
+                const res = await jwtAxios.get(`/reports/${generatedReportId}/files`);
                 const data = res.data;
                 const list = Array.isArray(data) ? data : data.files;
                 setFiles(list ?? []);
@@ -484,7 +443,7 @@ export default function ReportAnalyticsPage() {
     const handleDownload = async () => {
         if (!generatedReportId) return;
         try {
-            const res = await axiosInstance.get(`/reports/${generatedReportId}/download`, {
+            const res = await jwtAxios.get(`/reports/${generatedReportId}/download`, {
                 responseType: "blob",
             });
             downloadBlobFromAxios(res, "report");
@@ -497,7 +456,7 @@ export default function ReportAnalyticsPage() {
 
     const handleDownloadFile = async (fileId, fileName) => {
         try {
-            const res = await axiosInstance.get(`/report-files/${fileId}/download`, {
+            const res = await jwtAxios.get(`/report-files/${fileId}/download`, {
                 responseType: "blob",
             });
             downloadBlobFromAxios(res, fileName || "report");
@@ -520,7 +479,7 @@ export default function ReportAnalyticsPage() {
             setIsLogsLoading(true);
             setLogsMode({ type: "REPORT", fileId: null });
 
-            const res = await axiosInstance.get(`/reports/${reportId}/downloads`);
+            const res = await jwtAxios.get(`/reports/${reportId}/downloads`);
             const data = res.data;
             const list = Array.isArray(data)
                 ? data
@@ -540,7 +499,7 @@ export default function ReportAnalyticsPage() {
             setIsLogsLoading(true);
             setLogsMode({ type: "FILE", fileId });
 
-            const res = await axiosInstance.get(`/report-files/${fileId}/downloads`);
+            const res = await jwtAxios.get(`/report-files/${fileId}/downloads`);
             const data = res.data;
             const list = Array.isArray(data)
                 ? data
@@ -567,11 +526,11 @@ export default function ReportAnalyticsPage() {
     return (
         <AppLayout>
             <div className="report-page">
-                <div className="page-title"> 업무보드 &amp; 분석</div>
+                <div className="page-title">Report &amp; Analytics</div>
 
                 {/* 1) Filter Panel */}
                 <section className="section">
-                    <div className="section-title">필터 선택</div>
+                    <div className="section-title">Filter Panel</div>
 
                     <div className="panel panel-filter2">
                         <div className="filter-tabs">
@@ -591,14 +550,14 @@ export default function ReportAnalyticsPage() {
                         <div className="chips-row" style={{ display: "flex", alignItems: "center", gap: 12 }}>
                             <div className="filter-chips" style={{ display: "flex", gap: 10, flexWrap: "wrap", flex: 1 }}>
                                 {FILTERS.flatMap((f) =>
-                                        (selected[f.key] ?? []).map((v) => (
-                                            <span className="chip" key={`${f.key}-${v}`}>
-                      {f.label}: {v}
-                                                <button className="chip-x" type="button" onClick={() => removeChip(f.key, v)}>
-                        ×
-                      </button>
-                    </span>
-                                        ))
+                                    (selected[f.key] ?? []).map((v) => (
+                                        <span className="chip" key={`${f.key}-${v}`}>
+                                            {f.label}: {v}
+                                            <button className="chip-x" type="button" onClick={() => removeChip(f.key, v)}>
+                                                ×
+                                            </button>
+                                        </span>
+                                    ))
                                 )}
                             </div>
 
@@ -607,7 +566,7 @@ export default function ReportAnalyticsPage() {
                                 className="action-btn action-secondary"
                                 onClick={() => setSelected(getDefaultSelected())}
                             >
-                                초기화하기
+                                Clear Filters
                             </button>
                         </div>
 
@@ -672,27 +631,9 @@ export default function ReportAnalyticsPage() {
                     </div>
                 </section>
 
-                {role === "ADMIN" && selected.scope?.[0] === "Department" && (
-                    <div className="panel" style={{ marginTop: 10 }}>
-                        <div className="hint" style={{ marginBottom: 6 }}>Department</div>
-
-                        <select
-                            value={dept}
-                            onChange={(e) => setDept(e.target.value)}
-                            style={{ width: "100%" }}
-                        >
-                            <option value="">-- Select Department --</option>
-                            {departments.map((d) => (
-                                <option key={d} value={d}>{d}</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-
-
                 {/* 2) Report Type Selection */}
                 <section className="section">
-                    <div className="section-title">리포트 타입 선택</div>
+                    <div className="section-title">Report Type Selection</div>
 
                     <div className="panel">
                         <div className="radio-list">
@@ -713,7 +654,7 @@ export default function ReportAnalyticsPage() {
 
                 {/* 3) Preview */}
                 <section className="section">
-                    <div className="section-title">보고서 요약  Preview</div>
+                    <div className="section-title">Report Summary Preview</div>
 
                     <div className="panel preview-box">
                         <div className="doc-viewer">
@@ -799,7 +740,6 @@ export default function ReportAnalyticsPage() {
                             disabled={isGenerating}
                         >
                             {isGenerating ? "Generating..." : "Generate Report"}
-
                         </button>
 
                         <button
@@ -850,7 +790,7 @@ export default function ReportAnalyticsPage() {
                 {/* 5) Automation / Schedules (ADMIN only) */}
                 {role === "ADMIN" && (
                     <section className="section">
-                        <div className="section-title"> 자동화 및 스케줄러</div>
+                        <div className="section-title">Automation / Schedules</div>
 
                         <ScheduleModal
                             open={isScheduleModalOpen}
@@ -863,7 +803,7 @@ export default function ReportAnalyticsPage() {
                         <div className="panel">
                             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginBottom: 10 }}>
                                 <button type="button" className="action-btn action-secondary" onClick={openCreateScheduleModal}>
-                                    + 스케줄러 추가하기
+                                    + Create Schedule
                                 </button>
 
                                 <button
@@ -883,74 +823,74 @@ export default function ReportAnalyticsPage() {
                             ) : (
                                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                                     <thead>
-                                    <tr style={{ textAlign: "left", opacity: 0.75 }}>
-                                        <th style={{ padding: "8px 6px" }}>Name</th>
-                                        <th style={{ padding: "8px 6px" }}>Type</th>
-                                        <th style={{ padding: "8px 6px" }}>Scope</th>
-                                        <th style={{ padding: "8px 6px" }}>Format</th>
-                                        <th style={{ padding: "8px 6px" }}>Enabled</th>
-                                        <th style={{ padding: "8px 6px" }}>Next Run</th>
-                                        <th style={{ padding: "8px 6px" }}>Last Run</th>
-                                        <th style={{ padding: "8px 6px" }}>Last Job</th>
-                                        <th style={{ padding: "8px 6px" }}>Fail</th>
-                                        <th style={{ padding: "8px 6px" }}>Last Error</th>
-                                        <th style={{ padding: "8px 6px" }}>Actions</th>
-                                    </tr>
+                                        <tr style={{ textAlign: "left", opacity: 0.75 }}>
+                                            <th style={{ padding: "8px 6px" }}>Name</th>
+                                            <th style={{ padding: "8px 6px" }}>Type</th>
+                                            <th style={{ padding: "8px 6px" }}>Scope</th>
+                                            <th style={{ padding: "8px 6px" }}>Format</th>
+                                            <th style={{ padding: "8px 6px" }}>Enabled</th>
+                                            <th style={{ padding: "8px 6px" }}>Next Run</th>
+                                            <th style={{ padding: "8px 6px" }}>Last Run</th>
+                                            <th style={{ padding: "8px 6px" }}>Last Job</th>
+                                            <th style={{ padding: "8px 6px" }}>Fail</th>
+                                            <th style={{ padding: "8px 6px" }}>Last Error</th>
+                                            <th style={{ padding: "8px 6px" }}>Actions</th>
+                                        </tr>
                                     </thead>
                                     <tbody>
-                                    {schedules.map((s) => (
-                                        <tr key={s.id}>
-                                            <td style={{ padding: "8px 6px" }}>{s.name}</td>
-                                            <td style={{ padding: "8px 6px" }}>{s.reportTypeId}</td>
-                                            <td style={{ padding: "8px 6px" }}>{s.dataScope}</td>
-                                            <td style={{ padding: "8px 6px" }}>{s.outputFormat}</td>
-                                            <td style={{ padding: "8px 6px" }}>{s.isEnabled ? "ON" : "OFF"}</td>
-                                            <td style={{ padding: "8px 6px" }}>
-                                                {s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : "-"}
-                                            </td>
-                                            <td style={{ padding: "8px 6px" }}>
-                                                {s.lastRunAt ? new Date(s.lastRunAt).toLocaleString() : "-"}
-                                            </td>
-                                            <td style={{ padding: "8px 6px" }}>
-                                                {s.lastJobId ? (
-                                                    <a
-                                                        href={`${API_ORIGIN}/api/reports/${s.lastJobId}/download`}
-                                                        target="_blank"
-                                                        rel="noreferrer"
+                                        {schedules.map((s) => (
+                                            <tr key={s.id}>
+                                                <td style={{ padding: "8px 6px" }}>{s.name}</td>
+                                                <td style={{ padding: "8px 6px" }}>{s.reportTypeId}</td>
+                                                <td style={{ padding: "8px 6px" }}>{s.dataScope}</td>
+                                                <td style={{ padding: "8px 6px" }}>{s.outputFormat}</td>
+                                                <td style={{ padding: "8px 6px" }}>{s.isEnabled ? "ON" : "OFF"}</td>
+                                                <td style={{ padding: "8px 6px" }}>
+                                                    {s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : "-"}
+                                                </td>
+                                                <td style={{ padding: "8px 6px" }}>
+                                                    {s.lastRunAt ? new Date(s.lastRunAt).toLocaleString() : "-"}
+                                                </td>
+                                                <td style={{ padding: "8px 6px" }}>
+                                                    {s.lastJobId ? (
+                                                        <a
+                                                            href={`${API_ORIGIN}/api/reports/${s.lastJobId}/download`}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                        >
+                                                            download
+                                                        </a>
+                                                    ) : (
+                                                        "-"
+                                                    )}
+                                                </td>
+                                                <td style={{ padding: "8px 6px" }}>{s.failCount ?? 0}</td>
+                                                <td style={{ padding: "8px 6px" }}>{s.lastError ? String(s.lastError).slice(0, 120) : "-"}</td>
+                                                <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>
+                                                    <button type="button" className="action-btn action-secondary" onClick={() => handleRunNow(s.id)}>
+                                                        Run Now
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        className="action-btn action-secondary"
+                                                        style={{ marginLeft: 8 }}
+                                                        onClick={() => openEditScheduleModal(s)}
                                                     >
-                                                        download
-                                                    </a>
-                                                ) : (
-                                                    "-"
-                                                )}
-                                            </td>
-                                            <td style={{ padding: "8px 6px" }}>{s.failCount ?? 0}</td>
-                                            <td style={{ padding: "8px 6px" }}>{s.lastError ? String(s.lastError).slice(0, 120) : "-"}</td>
-                                            <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>
-                                                <button type="button" className="action-btn action-secondary" onClick={() => handleRunNow(s.id)}>
-                                                    Run Now
-                                                </button>
+                                                        Edit
+                                                    </button>
 
-                                                <button
-                                                    type="button"
-                                                    className="action-btn action-secondary"
-                                                    style={{ marginLeft: 8 }}
-                                                    onClick={() => openEditScheduleModal(s)}
-                                                >
-                                                    Edit
-                                                </button>
-
-                                                <button
-                                                    type="button"
-                                                    className="action-btn action-secondary"
-                                                    style={{ marginLeft: 8 }}
-                                                    onClick={() => handleToggleEnabled(s)}
-                                                >
-                                                    {s.isEnabled ? "Disable" : "Enable"}
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                    <button
+                                                        type="button"
+                                                        className="action-btn action-secondary"
+                                                        style={{ marginLeft: 8 }}
+                                                        onClick={() => handleToggleEnabled(s)}
+                                                    >
+                                                        {s.isEnabled ? "Disable" : "Enable"}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
                                     </tbody>
                                 </table>
                             )}
@@ -973,29 +913,29 @@ export default function ReportAnalyticsPage() {
                             ) : (
                                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                                     <thead>
-                                    <tr style={{ textAlign: "left", opacity: 0.75 }}>
-                                        <th style={{ padding: "8px 6px" }}>ID</th>
-                                        <th style={{ padding: "8px 6px" }}>ReportFile ID</th>
-                                        <th style={{ padding: "8px 6px" }}>Downloaded By</th>
-                                        <th style={{ padding: "8px 6px" }}>Downloaded At</th>
-                                    </tr>
+                                        <tr style={{ textAlign: "left", opacity: 0.75 }}>
+                                            <th style={{ padding: "8px 6px" }}>ID</th>
+                                            <th style={{ padding: "8px 6px" }}>ReportFile ID</th>
+                                            <th style={{ padding: "8px 6px" }}>Downloaded By</th>
+                                            <th style={{ padding: "8px 6px" }}>Downloaded At</th>
+                                        </tr>
                                     </thead>
                                     <tbody>
-                                    {downloadLogs.map((log) => {
-                                        const id = log.logId ?? log.id;
-                                        const fileId = log.fileId ?? log.reportFileId;
-                                        const who = log.downloadedBy ?? log.download_by;
-                                        const at = log.downloadedAt ?? log.downloaded_at;
+                                        {downloadLogs.map((log) => {
+                                            const id = log.logId ?? log.id;
+                                            const fileId = log.fileId ?? log.reportFileId;
+                                            const who = log.downloadedBy ?? log.download_by;
+                                            const at = log.downloadedAt ?? log.downloaded_at;
 
-                                        return (
-                                            <tr key={id ?? `${fileId}-${at}`}>
-                                                <td style={{ padding: "8px 6px" }}>{id ?? "-"}</td>
-                                                <td style={{ padding: "8px 6px" }}>{fileId ?? "-"}</td>
-                                                <td style={{ padding: "8px 6px" }}>{who ?? "-"}</td>
-                                                <td style={{ padding: "8px 6px" }}>{at ? new Date(at).toLocaleString() : "-"}</td>
-                                            </tr>
-                                        );
-                                    })}
+                                            return (
+                                                <tr key={id ?? `${fileId}-${at}`}>
+                                                    <td style={{ padding: "8px 6px" }}>{id ?? "-"}</td>
+                                                    <td style={{ padding: "8px 6px" }}>{fileId ?? "-"}</td>
+                                                    <td style={{ padding: "8px 6px" }}>{who ?? "-"}</td>
+                                                    <td style={{ padding: "8px 6px" }}>{at ? new Date(at).toLocaleString() : "-"}</td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             )}

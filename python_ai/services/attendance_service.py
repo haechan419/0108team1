@@ -6,7 +6,7 @@ import pandas as pd
 import os
 import uuid
 from datetime import datetime
-from app.services.ollama_service import OllamaService
+from services.ollama_service import OllamaService
 
 class AttendanceService:
     def __init__(self, ollama_service: OllamaService):
