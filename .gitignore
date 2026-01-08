@@ -1,0 +1,10 @@
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Node / Frontend
+node_modules/
+
+# Build artifacts
+build/
+dist/
