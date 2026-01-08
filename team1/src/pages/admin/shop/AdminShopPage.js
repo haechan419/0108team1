@@ -9,30 +9,32 @@ import {
   API_SERVER_HOST,
 } from "../../../api/productApi";
 
-//  초기 상태에 status 추가 (기본값 true: 판매중)
 const productInitState = {
   pname: "",
   price: 0,
   pdesc: "",
   category: "사무용품",
   stockQuantity: 100,
-  status: true, // 판매 상태 추가
   files: [],
 };
 
 const CATEGORIES = ["All", "사무용품", "전자기기", "탕비실", "가구"];
 
 const AdminShopPage = () => {
+  // 전체 데이터 (드래그 정렬을 위해 한 번에 로드)
   const [allProducts, setAllProducts] = useState([]);
   const [currentCategory, setCurrentCategory] = useState("All");
 
+  // ✨ 페이지네이션 상태
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 15;
+  const itemsPerPage = 15; // 한 페이지당 12개씩 보기
 
+  // 모달 및 편집 상태
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState({ ...productInitState });
   const [mode, setMode] = useState("ADD");
 
+  // 드래그 & 선택 상태
   const dragItem = useRef();
   const dragOverItem = useRef();
   const [isOrderChanged, setIsOrderChanged] = useState(false);
@@ -40,44 +42,36 @@ const AdminShopPage = () => {
 
   const uploadRef = useRef();
 
+  // 1. 데이터 불러오기 (한 번에 100개 로드 -> 클라이언트에서 자름)
   const fetchData = useCallback((category) => {
-    // 혹시 모르니 size를 50으로 살짝 줄여서 요청
-    getList({ page: 1, size: 50, category: category })
+    getList({ page: 1, size: 100, category: category })
       .then((data) => {
-        console.log("🔥 관리자 페이지 데이터 도착:", data);
-
-        const resultList = data.dtoList || data.content || [];
-
-        if (resultList.length === 0) {
-          console.warn(
-            "⚠️ 데이터 배열이 비어있습니다! (DB에 데이터가 없거나, 페이지 번호 문제)"
-          );
-        }
-
-        setAllProducts(resultList);
+        setAllProducts(data.content);
         setIsOrderChanged(false);
         setSelectedIds([]);
-        setCurrentPage(1);
+        setCurrentPage(1); // 카테고리 변경 시 1페이지로
       })
-      .catch((err) => {
-        console.error("🚨 데이터 가져오기 실패:", err);
-      });
+      .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     fetchData(currentCategory);
   }, [currentCategory, fetchData]);
 
+  // ✨ 현재 페이지에 보여줄 데이터 계산
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = allProducts.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(allProducts.length / itemsPerPage);
 
+  // 페이지 변경 핸들러
   const handlePageChange = (pageNum) => {
     setCurrentPage(pageNum);
   };
 
+  // --- 드래그 앤 드롭 로직 ---
   const dragStart = (e, index) => {
+    // 전체 리스트 기준 인덱스로 변환
     const globalIndex = indexOfFirstItem + index;
     dragItem.current = globalIndex;
     e.target.style.opacity = "0.4";
@@ -89,42 +83,22 @@ const AdminShopPage = () => {
   const dragEnd = (e) => {
     e.target.style.opacity = "1";
 
-    // 1. 시작점이나 도착점이 없으면 그냥 취소 (원위치)
-    if (dragItem.current === null || dragOverItem.current === null) {
-      return;
-    }
-
-    // 2. 제자리에 놓았으면 취소
-    if (dragItem.current === dragOverItem.current) {
-      return;
-    }
-
-    // 3. 배열 재정렬 로직
+    // 전체 리스트 복사 후 재배열
     const copyList = [...allProducts];
-
-    // 이동할 아이템 내용 꺼내기
     const dragItemContent = copyList[dragItem.current];
-
-    // 기존 위치에서 삭제
     copyList.splice(dragItem.current, 1);
-
-    // 새 위치에 삽입
     copyList.splice(dragOverItem.current, 0, dragItemContent);
 
-    // 참조값 초기화
     dragItem.current = null;
     dragOverItem.current = null;
-
-    // ✨ 화면 업데이트 (이게 되어야 안 튕김)
     setAllProducts(copyList);
-
-    // "저장 버튼" 활성화
     setIsOrderChanged(true);
   };
 
+  // 순서 DB 저장
   const handleApplyOrder = () => {
     if (!isOrderChanged) return;
-    const pnoList = allProducts.map((p) => p.pno);
+    const pnoList = allProducts.map((p) => p.pno); // 전체 리스트의 순서 저장
 
     putOrder(pnoList)
       .then(() => {
@@ -135,12 +109,9 @@ const AdminShopPage = () => {
       .catch(() => alert("순서 저장 실패"));
   };
 
-  // 입력 핸들러 (checkbox 처리 추가)
-  const handleChange = (e) => {
-    const value =
-      e.target.type === "checkbox" ? e.target.checked : e.target.value;
-    setCurrentProduct({ ...currentProduct, [e.target.name]: value });
-  };
+  // --- CRUD 핸들러 ---
+  const handleChange = (e) =>
+    setCurrentProduct({ ...currentProduct, [e.target.name]: e.target.value });
 
   const handleSave = () => {
     const formData = new FormData();
@@ -149,10 +120,6 @@ const AdminShopPage = () => {
     formData.append("price", currentProduct.price);
     formData.append("category", currentProduct.category);
     formData.append("stockQuantity", currentProduct.stockQuantity);
-
-    // status 값 전송 (boolean -> String 변환 필요할 수 있음)
-    formData.append("status", currentProduct.status);
-
     if (uploadRef.current?.files.length > 0) {
       for (let i = 0; i < uploadRef.current.files.length; i++)
         formData.append("files", uploadRef.current.files[i]);
@@ -178,8 +145,7 @@ const AdminShopPage = () => {
   const openModal = (product = null) => {
     if (product) {
       setMode("EDIT");
-      // status가 없는 경우 기본값 true 처리
-      setCurrentProduct({ ...product, status: product.status !== false });
+      setCurrentProduct(product);
     } else {
       setMode("ADD");
       setCurrentProduct({ ...productInitState });
@@ -205,6 +171,7 @@ const AdminShopPage = () => {
   return (
     <AppLayout>
       <div style={{ padding: "30px", maxWidth: "1600px", margin: "0 auto" }}>
+        {/* 상단 헤더 */}
         <div style={headerContainerStyle}>
           <div>
             <h2
@@ -250,18 +217,16 @@ const AdminShopPage = () => {
           </div>
         </div>
 
+        {/* ✨ 상품 그리드 (현재 페이지 아이템만 렌더링) */}
         <div style={gridContainerStyle}>
           {currentItems.map((product, index) => (
             <div
               key={product.pno}
               draggable
-              onDragStart={(e) => dragStart(e, index)}
+              onDragStart={(e) => dragStart(e, index)} // 현재 페이지 내 인덱스 전달
               onDragEnter={(e) => dragEnter(e, index)}
-              onDragOver={(e) => {
-                e.preventDefault();
-                dragEnter(e, index);
-              }}
               onDragEnd={dragEnd}
+              onDragOver={(e) => e.preventDefault()}
               style={{
                 ...cardStyle,
                 border: selectedIds.includes(product.pno)
@@ -270,14 +235,11 @@ const AdminShopPage = () => {
                 backgroundColor: selectedIds.includes(product.pno)
                   ? "#fbfdff"
                   : "white",
-                // 판매 중지된 상품 흐리게 표시
-                opacity: product.status ? 1 : 0.6,
               }}
             >
+
               <div style={imageContainerStyle}>
-                {/* 안전한 이미지 접근 (?. 사용) */}
-                {product.uploadFileNames &&
-                product.uploadFileNames.length > 0 ? (
+                {product.uploadFileNames.length > 0 ? (
                   <img
                     src={`${API_SERVER_HOST}/api/products/view/s_${product.uploadFileNames[0]}`}
                     alt={product.pname}
@@ -289,15 +251,7 @@ const AdminShopPage = () => {
               </div>
 
               <div style={infoContainerStyle}>
-                <div style={categoryBadgeStyle}>
-                  {product.category}
-                  {/* ✨ [수정 6] 상태 뱃지 표시 */}
-                  {!product.status && (
-                    <span style={{ color: "red", marginLeft: "5px" }}>
-                      (판매중지)
-                    </span>
-                  )}
-                </div>
+                <div style={categoryBadgeStyle}>{product.category}</div>
                 <div style={productNameStyle}>{product.pname}</div>
                 <div style={priceRowStyle}>
                   <span style={priceStyle}>
@@ -348,6 +302,7 @@ const AdminShopPage = () => {
           )}
         </div>
 
+        {/* ✨ 페이지네이션 컨트롤 (숫자 버튼) */}
         {totalPages > 0 && (
           <div
             style={{
@@ -365,7 +320,7 @@ const AdminShopPage = () => {
                   style={{
                     padding: "10px 16px",
                     border: "none",
-                    borderRadius: "50%",
+                    borderRadius: "50%", // 원형 버튼
                     cursor: "pointer",
                     backgroundColor:
                       currentPage === pageNum ? "#2c3e50" : "white",
@@ -382,43 +337,11 @@ const AdminShopPage = () => {
           </div>
         )}
 
+        {/* 모달 (기존 유지) */}
         {isModalOpen && (
           <div style={modalOverlayStyle}>
             <div style={modalContentStyle}>
               <h3>{mode === "ADD" ? "상품 등록" : "상품 수정"}</h3>
-
-              {/*  판매 상태 체크박스 추가 */}
-              <div
-                style={{
-                  ...inputGroupStyle,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                }}
-              >
-                <label style={{ margin: 0 }}>판매 상태:</label>
-                <label
-                  style={{
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    name="status"
-                    checked={currentProduct.status}
-                    onChange={handleChange}
-                    style={{
-                      width: "20px",
-                      height: "20px",
-                      marginRight: "5px",
-                    }}
-                  />
-                  {currentProduct.status ? "판매 중" : "판매 중지"}
-                </label>
-              </div>
-
               <div style={inputGroupStyle}>
                 <label>카테고리</label>
                 <select
@@ -504,7 +427,7 @@ const AdminShopPage = () => {
   );
 };
 
-// 스타일 (기존과 동일)
+// 스타일 (동일 유지)
 const headerContainerStyle = {
   display: "flex",
   justifyContent: "space-between",
@@ -536,6 +459,12 @@ const cardStyle = {
   display: "flex",
   flexDirection: "column",
   justifyContent: "space-between",
+};
+const cardHeaderStyle = {
+  position: "absolute",
+  top: "10px",
+  left: "10px",
+  zIndex: 10,
 };
 const imageContainerStyle = {
   width: "100%",
@@ -617,6 +546,14 @@ const btnStyle = {
     border: "none",
     borderRadius: "8px",
     cursor: "default",
+  },
+  deleteBatch: {
+    padding: "10px 20px",
+    background: "#e74c3c",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
   },
   save: {
     padding: "10px 20px",

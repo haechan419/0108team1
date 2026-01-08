@@ -49,22 +49,20 @@ public class SecurityConfig {
         return new JWTCheckFilter();
     }
 
-
     @Bean
     @Order(HIGHEST_PRECEDENCE)
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
         config.setAllowedOrigins(List.of("http://localhost:3000"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of(
                 "Content-Type",
                 "Authorization",
                 "Cache-Control",
                 "X-User-Id",
                 "X-Role",
-                "X-Dept"
-        ));
+                "X-Dept"));
         config.setExposedHeaders(List.of("Content-Disposition"));
 
         config.setAllowCredentials(false);
@@ -98,8 +96,7 @@ public class SecurityConfig {
                         // ✅ 로그인 필요
                         .requestMatchers("/api/reports/**").authenticated()
 
-                        .anyRequest().permitAll()
-                )
+                        .anyRequest().permitAll())
 
                 // ✅ API는 리다이렉트 금지: 무조건 401 JSON
                 .exceptionHandling(e -> e
@@ -109,9 +106,7 @@ public class SecurityConfig {
                                     response.setContentType("application/json; charset=UTF-8");
                                     response.getWriter().write("{\"success\":false,\"message\":\"UNAUTHORIZED\"}");
                                 },
-                                new AntPathRequestMatcher("/api/**")
-                        )
-                )
+                                new AntPathRequestMatcher("/api/**")))
 
                 // ✅ 로그인은 처리 URL만 사용 (페이지 렌더링 X)
                 .formLogin(form -> form
@@ -119,8 +114,7 @@ public class SecurityConfig {
                         .usernameParameter("employeeNo")
                         .passwordParameter("password")
                         .successHandler(new APILoginSuccessHandler(eventPublisher))
-                        .failureHandler(new APILoginFailHandler(eventPublisher))
-                )
+                        .failureHandler(new APILoginFailHandler(eventPublisher)))
 
                 .logout(logout -> logout
                         .logoutUrl("/api/auth/logout")
@@ -128,8 +122,7 @@ public class SecurityConfig {
                             response.setStatus(200);
                             response.setContentType("application/json; charset=UTF-8");
                             response.getWriter().write("{\"success\":true,\"message\":\"로그아웃 성공\"}");
-                        })
-                )
+                        }))
 
                 .httpBasic(basic -> basic.disable());
 

@@ -70,11 +70,11 @@ public class ExpenseServiceImpl implements ExpenseService {
                 .filter(dto -> dto != null)
                 .collect(Collectors.toList());
 
-        return PageResponseDTO.<ExpenseDTO>withAll()
-                .dtoList(dtoList)
-                .totalCount(result.getTotalElements())
-                .pageRequestDTO(pageRequestDTO)
-                .build();
+        return PageResponseDTO.of(
+                dtoList,
+                pageRequestDTO,
+                result.getTotalElements()
+        );
     }
 
     @Override

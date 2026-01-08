@@ -52,4 +52,11 @@ export const accountingApi = {
   getDepartments: () => {
     return jwtAxios.get(`${prefix}/departments`);
   },
+
+};
+
+// 한해찬 추가
+export const getMonthlyExpenseTrend = async (params) => {
+  const res = await jwtAxios.get(`${prefix}/statistics/monthly-trend`, { params });
+  return res.data;
 };

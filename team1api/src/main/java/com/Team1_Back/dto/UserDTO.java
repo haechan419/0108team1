@@ -28,10 +28,18 @@ public class UserDTO extends User {
     private boolean locked;
     private int failedLoginCount;
     private List<String> roleNames = new ArrayList<>();
+    private String profileImageUrl;  // 프로필 이미지 URL 추가
 
     public UserDTO(Long id, String employeeNo, String password, String name,
                    String email, String departmentName, boolean active,
                    boolean locked, int failedLoginCount, List<String> roleNames) {
+        this(id, employeeNo, password, name, email, departmentName, active, locked, failedLoginCount, roleNames, null);
+    }
+
+    public UserDTO(Long id, String employeeNo, String password, String name,
+                   String email, String departmentName, boolean active,
+                   boolean locked, int failedLoginCount, List<String> roleNames,
+                   String profileImageUrl) {
 
         super(
                 employeeNo,
@@ -56,6 +64,7 @@ public class UserDTO extends User {
         this.locked = locked;
         this.failedLoginCount = failedLoginCount;
         this.roleNames = (roleNames == null) ? new ArrayList<>() : roleNames;
+        this.profileImageUrl = profileImageUrl;
     }
 
     // 응답용 데이터
@@ -68,6 +77,7 @@ public class UserDTO extends User {
         dataMap.put("email", email);
         dataMap.put("departmentName", departmentName);
         dataMap.put("roleNames", roleNames);
+        dataMap.put("profileImageUrl", profileImageUrl);  // 프로필 이미지 URL 추가
 
         return dataMap;
     }

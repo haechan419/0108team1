@@ -4,7 +4,7 @@ import expenseSlice from "./slices/expenseSlice";
 import approvalSlice from "./slices/approvalSlice";
 import receiptSlice from "./slices/receiptSlice";
 import userSlice from "./slices/userSlice";
-import notificationReducer from "./slices/notificationSlice";
+import todoSlice from "./slices/todoSlice";
 
 const store = configureStore({
   reducer: {
@@ -13,7 +13,7 @@ const store = configureStore({
     approval: approvalSlice, // state.approval
     receipt: receiptSlice, // state.receipt
     user: userSlice, // state.user
-    notification: notificationReducer, // state.notification
+    todo: todoSlice, // state.todo
   },
 });
 

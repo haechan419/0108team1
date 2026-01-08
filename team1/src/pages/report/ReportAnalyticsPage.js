@@ -1,16 +1,47 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSelector } from "react-redux";
+
 import AppLayout from "../../components/layout/AppLayout";
 import "../../styles/report.css";
 import { REPORT_TYPES } from "../../constants/reportTypes";
-import axiosInstance from "../../api/axiosInstance"; // ✅ 경로 맞춰줘 (네 프로젝트 기준)
+import jwtAxios from "../../util/jwtUtil";
 
 export default function ReportAnalyticsPage() {
     // ✅ 링크(a href)용: 파일 다운로드를 새 탭으로 열 때만 사용
     // axiosInstance는 baseURL이 /api까지 포함이므로, 앵커는 origin을 별도로 둠
     const API_ORIGIN = "http://localhost:8080";
+    const loginState = useSelector((state) => state.loginSlice);
+
+    const role = useMemo(() => {
+        const roles = loginState?.roleNames ?? loginState?.roles ?? [];
+        const single = loginState?.role ?? loginState?.roleName;
+
+        const upperRoles = (Array.isArray(roles) ? roles : [])
+            .map((r) => String(r).toUpperCase());
+        const upperSingle = single ? String(single).toUpperCase() : "";
+
+        if (upperRoles.includes("ADMIN") || upperSingle === "ADMIN") return "ADMIN";
+        if (upperRoles.includes("EMPLOYEE") || upperSingle === "EMPLOYEE") return "EMPLOYEE";
+
+        // ✅ 혹시 서버가 USER로 주면 EMPLOYEE로 치환(프로젝트 정책상 USER=EMPLOYEE라면)
+        if (upperRoles.includes("USER") || upperSingle === "USER") return "EMPLOYEE";
+
+        return "EMPLOYEE"; // 기본값
+    }, [loginState]);
+
+    // "누가 요청했는지"는 프론트에서 박지 말고 보통 서버가 JWT/세션에서 뽑는 게 정석
+    const requester = useMemo(() => {
+        return loginState?.employeeNo ?? loginState?.id ?? null;
+    }, [loginState]);
+
+    // ADMIN: /admin/report-schedules
+    // USER : /report-schedules
+    const SCHEDULE_BASE = role === "ADMIN" ? "/admin/report-schedules" : "/report-schedules";
+
+
 
     // ✅ 실제로는 로그인 훅/스토어에서 role 받아오면 됨
-    const [role] = useState("ADMIN");
+    // const [role] = useState("ADMIN");
 
     const SCOPE_MAP = { "My Data": "MY", Department: "DEPT", All: "ALL" };
     const FORMAT_MAP = { PDF: "PDF", Excel: "EXCEL", EXCEL: "EXCEL" };
@@ -59,10 +90,11 @@ export default function ReportAnalyticsPage() {
     const [schedules, setSchedules] = useState([]);
     const [isSchedulesLoading, setIsSchedulesLoading] = useState(false);
 
+
     const fetchSchedules = async () => {
         try {
             setIsSchedulesLoading(true);
-            const res = await axiosInstance.get("/admin/report-schedules");
+            const res = await jwtAxios.get(SCHEDULE_BASE);
             const data = res.data;
             setSchedules(data?.items ?? (Array.isArray(data) ? data : []));
         } catch (e) {
@@ -74,20 +106,20 @@ export default function ReportAnalyticsPage() {
     };
 
     const createSchedule = async (payload) => {
-        const res = await axiosInstance.post("/admin/report-schedules", payload);
+        const res = await jwtAxios.post(SCHEDULE_BASE, payload);
         return res.data;
     };
 
     const updateSchedule = async (id, payload) => {
-        const res = await axiosInstance.put(`/admin/report-schedules/${id}`, payload);
+        const res = await jwtAxios.put(`${SCHEDULE_BASE}/${id}`, payload);
         return res.data;
     };
 
     const runScheduleNow = async (id) => {
-        // 기존: POST /api/admin/report-schedules/{id}/run
-        const res = await axiosInstance.post(`/admin/report-schedules/${id}/run`);
+        const res = await jwtAxios.post(`${SCHEDULE_BASE}/${id}/run`);
         return res.data;
     };
+
 
     // -------------------------
     // RBAC options
@@ -101,6 +133,11 @@ export default function ReportAnalyticsPage() {
         () => (role === "ADMIN" ? ["Department", "All"] : ["My Data"]),
         [role]
     );
+
+    useEffect(() => {
+        if (role === "EMPLOYEE") setSelected((p) => ({ ...p, scope: ["My Data"] }));
+    }, [role]);
+
 
     // -------------------------
     // Filter defs (CSS 구조 고정)
@@ -195,6 +232,14 @@ export default function ReportAnalyticsPage() {
             alert(String(e?.response?.data?.message ?? e?.message ?? e));
         }
     };
+
+    const currentType = useMemo(
+        () => REPORT_TYPES.find((t) => t.id === reportTypeId),
+        [reportTypeId]
+    );
+
+    const effectiveFormat = currentType?.outputFormat ?? "PDF"; // fallback
+
 
     const handleRunNow = async (id) => {
         try {
@@ -308,6 +353,7 @@ export default function ReportAnalyticsPage() {
     // API: Generate
     // -------------------------
     const handleGenerate = async () => {
+
         try {
             setIsGenerating(true);
 
@@ -321,11 +367,13 @@ export default function ReportAnalyticsPage() {
                     period: selected.period?.[0] ?? null,
                     dataScope: SCOPE_MAP[uiScope] ?? (role === "ADMIN" ? "DEPT" : "MY"),
                     category: selected.category?.length ? selected.category : ["ALL"],
-                    format,
+                    format: effectiveFormat,
                 },
             };
+            console.log("[GEN payload]", payload);
 
-            const res = await axiosInstance.post("/reports/generate", payload);
+
+            const res = await jwtAxios.post("/reports/generate", payload);
             const data = res.data;
 
             setGeneratedReportId(data.reportId);
@@ -353,7 +401,7 @@ export default function ReportAnalyticsPage() {
         (async () => {
             try {
                 setIsFilesLoading(true);
-                const res = await axiosInstance.get(`/reports/${generatedReportId}/files`);
+                const res = await jwtAxios.get(`/reports/${generatedReportId}/files`);
                 const data = res.data;
                 const list = Array.isArray(data) ? data : data.files;
                 setFiles(list ?? []);
@@ -395,7 +443,7 @@ export default function ReportAnalyticsPage() {
     const handleDownload = async () => {
         if (!generatedReportId) return;
         try {
-            const res = await axiosInstance.get(`/reports/${generatedReportId}/download`, {
+            const res = await jwtAxios.get(`/reports/${generatedReportId}/download`, {
                 responseType: "blob",
             });
             downloadBlobFromAxios(res, "report");
@@ -408,7 +456,7 @@ export default function ReportAnalyticsPage() {
 
     const handleDownloadFile = async (fileId, fileName) => {
         try {
-            const res = await axiosInstance.get(`/report-files/${fileId}/download`, {
+            const res = await jwtAxios.get(`/report-files/${fileId}/download`, {
                 responseType: "blob",
             });
             downloadBlobFromAxios(res, fileName || "report");
@@ -431,7 +479,7 @@ export default function ReportAnalyticsPage() {
             setIsLogsLoading(true);
             setLogsMode({ type: "REPORT", fileId: null });
 
-            const res = await axiosInstance.get(`/reports/${reportId}/downloads`);
+            const res = await jwtAxios.get(`/reports/${reportId}/downloads`);
             const data = res.data;
             const list = Array.isArray(data)
                 ? data
@@ -451,7 +499,7 @@ export default function ReportAnalyticsPage() {
             setIsLogsLoading(true);
             setLogsMode({ type: "FILE", fileId });
 
-            const res = await axiosInstance.get(`/report-files/${fileId}/downloads`);
+            const res = await jwtAxios.get(`/report-files/${fileId}/downloads`);
             const data = res.data;
             const list = Array.isArray(data)
                 ? data
@@ -502,14 +550,14 @@ export default function ReportAnalyticsPage() {
                         <div className="chips-row" style={{ display: "flex", alignItems: "center", gap: 12 }}>
                             <div className="filter-chips" style={{ display: "flex", gap: 10, flexWrap: "wrap", flex: 1 }}>
                                 {FILTERS.flatMap((f) =>
-                                        (selected[f.key] ?? []).map((v) => (
-                                            <span className="chip" key={`${f.key}-${v}`}>
-                      {f.label}: {v}
-                                                <button className="chip-x" type="button" onClick={() => removeChip(f.key, v)}>
-                        ×
-                      </button>
-                    </span>
-                                        ))
+                                    (selected[f.key] ?? []).map((v) => (
+                                        <span className="chip" key={`${f.key}-${v}`}>
+                                            {f.label}: {v}
+                                            <button className="chip-x" type="button" onClick={() => removeChip(f.key, v)}>
+                                                ×
+                                            </button>
+                                        </span>
+                                    ))
                                 )}
                             </div>
 
@@ -730,24 +778,8 @@ export default function ReportAnalyticsPage() {
                                             </div>
                                         </div>
 
-                                        <button
-                                            type="button"
-                                            className="action-btn action-primary2"
-                                            onClick={() => handleDownloadFile(f.fileId ?? f.id, f.fileName)}
-                                        >
-                                            Download
-                                        </button>
 
-                                        {role === "ADMIN" && (
-                                            <button
-                                                type="button"
-                                                className="action-btn action-secondary"
-                                                onClick={() => fetchLogsByFile(f.fileId ?? f.id)}
-                                                style={{ marginLeft: 8 }}
-                                            >
-                                                Logs
-                                            </button>
-                                        )}
+
                                     </li>
                                 ))}
                             </ul>
@@ -791,74 +823,74 @@ export default function ReportAnalyticsPage() {
                             ) : (
                                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                                     <thead>
-                                    <tr style={{ textAlign: "left", opacity: 0.75 }}>
-                                        <th style={{ padding: "8px 6px" }}>Name</th>
-                                        <th style={{ padding: "8px 6px" }}>Type</th>
-                                        <th style={{ padding: "8px 6px" }}>Scope</th>
-                                        <th style={{ padding: "8px 6px" }}>Format</th>
-                                        <th style={{ padding: "8px 6px" }}>Enabled</th>
-                                        <th style={{ padding: "8px 6px" }}>Next Run</th>
-                                        <th style={{ padding: "8px 6px" }}>Last Run</th>
-                                        <th style={{ padding: "8px 6px" }}>Last Job</th>
-                                        <th style={{ padding: "8px 6px" }}>Fail</th>
-                                        <th style={{ padding: "8px 6px" }}>Last Error</th>
-                                        <th style={{ padding: "8px 6px" }}>Actions</th>
-                                    </tr>
+                                        <tr style={{ textAlign: "left", opacity: 0.75 }}>
+                                            <th style={{ padding: "8px 6px" }}>Name</th>
+                                            <th style={{ padding: "8px 6px" }}>Type</th>
+                                            <th style={{ padding: "8px 6px" }}>Scope</th>
+                                            <th style={{ padding: "8px 6px" }}>Format</th>
+                                            <th style={{ padding: "8px 6px" }}>Enabled</th>
+                                            <th style={{ padding: "8px 6px" }}>Next Run</th>
+                                            <th style={{ padding: "8px 6px" }}>Last Run</th>
+                                            <th style={{ padding: "8px 6px" }}>Last Job</th>
+                                            <th style={{ padding: "8px 6px" }}>Fail</th>
+                                            <th style={{ padding: "8px 6px" }}>Last Error</th>
+                                            <th style={{ padding: "8px 6px" }}>Actions</th>
+                                        </tr>
                                     </thead>
                                     <tbody>
-                                    {schedules.map((s) => (
-                                        <tr key={s.id}>
-                                            <td style={{ padding: "8px 6px" }}>{s.name}</td>
-                                            <td style={{ padding: "8px 6px" }}>{s.reportTypeId}</td>
-                                            <td style={{ padding: "8px 6px" }}>{s.dataScope}</td>
-                                            <td style={{ padding: "8px 6px" }}>{s.outputFormat}</td>
-                                            <td style={{ padding: "8px 6px" }}>{s.isEnabled ? "ON" : "OFF"}</td>
-                                            <td style={{ padding: "8px 6px" }}>
-                                                {s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : "-"}
-                                            </td>
-                                            <td style={{ padding: "8px 6px" }}>
-                                                {s.lastRunAt ? new Date(s.lastRunAt).toLocaleString() : "-"}
-                                            </td>
-                                            <td style={{ padding: "8px 6px" }}>
-                                                {s.lastJobId ? (
-                                                    <a
-                                                        href={`${API_ORIGIN}/api/reports/${s.lastJobId}/download`}
-                                                        target="_blank"
-                                                        rel="noreferrer"
+                                        {schedules.map((s) => (
+                                            <tr key={s.id}>
+                                                <td style={{ padding: "8px 6px" }}>{s.name}</td>
+                                                <td style={{ padding: "8px 6px" }}>{s.reportTypeId}</td>
+                                                <td style={{ padding: "8px 6px" }}>{s.dataScope}</td>
+                                                <td style={{ padding: "8px 6px" }}>{s.outputFormat}</td>
+                                                <td style={{ padding: "8px 6px" }}>{s.isEnabled ? "ON" : "OFF"}</td>
+                                                <td style={{ padding: "8px 6px" }}>
+                                                    {s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : "-"}
+                                                </td>
+                                                <td style={{ padding: "8px 6px" }}>
+                                                    {s.lastRunAt ? new Date(s.lastRunAt).toLocaleString() : "-"}
+                                                </td>
+                                                <td style={{ padding: "8px 6px" }}>
+                                                    {s.lastJobId ? (
+                                                        <a
+                                                            href={`${API_ORIGIN}/api/reports/${s.lastJobId}/download`}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                        >
+                                                            download
+                                                        </a>
+                                                    ) : (
+                                                        "-"
+                                                    )}
+                                                </td>
+                                                <td style={{ padding: "8px 6px" }}>{s.failCount ?? 0}</td>
+                                                <td style={{ padding: "8px 6px" }}>{s.lastError ? String(s.lastError).slice(0, 120) : "-"}</td>
+                                                <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>
+                                                    <button type="button" className="action-btn action-secondary" onClick={() => handleRunNow(s.id)}>
+                                                        Run Now
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        className="action-btn action-secondary"
+                                                        style={{ marginLeft: 8 }}
+                                                        onClick={() => openEditScheduleModal(s)}
                                                     >
-                                                        download
-                                                    </a>
-                                                ) : (
-                                                    "-"
-                                                )}
-                                            </td>
-                                            <td style={{ padding: "8px 6px" }}>{s.failCount ?? 0}</td>
-                                            <td style={{ padding: "8px 6px" }}>{s.lastError ? String(s.lastError).slice(0, 120) : "-"}</td>
-                                            <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>
-                                                <button type="button" className="action-btn action-secondary" onClick={() => handleRunNow(s.id)}>
-                                                    Run Now
-                                                </button>
+                                                        Edit
+                                                    </button>
 
-                                                <button
-                                                    type="button"
-                                                    className="action-btn action-secondary"
-                                                    style={{ marginLeft: 8 }}
-                                                    onClick={() => openEditScheduleModal(s)}
-                                                >
-                                                    Edit
-                                                </button>
-
-                                                <button
-                                                    type="button"
-                                                    className="action-btn action-secondary"
-                                                    style={{ marginLeft: 8 }}
-                                                    onClick={() => handleToggleEnabled(s)}
-                                                >
-                                                    {s.isEnabled ? "Disable" : "Enable"}
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                    <button
+                                                        type="button"
+                                                        className="action-btn action-secondary"
+                                                        style={{ marginLeft: 8 }}
+                                                        onClick={() => handleToggleEnabled(s)}
+                                                    >
+                                                        {s.isEnabled ? "Disable" : "Enable"}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
                                     </tbody>
                                 </table>
                             )}
@@ -881,29 +913,29 @@ export default function ReportAnalyticsPage() {
                             ) : (
                                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                                     <thead>
-                                    <tr style={{ textAlign: "left", opacity: 0.75 }}>
-                                        <th style={{ padding: "8px 6px" }}>ID</th>
-                                        <th style={{ padding: "8px 6px" }}>ReportFile ID</th>
-                                        <th style={{ padding: "8px 6px" }}>Downloaded By</th>
-                                        <th style={{ padding: "8px 6px" }}>Downloaded At</th>
-                                    </tr>
+                                        <tr style={{ textAlign: "left", opacity: 0.75 }}>
+                                            <th style={{ padding: "8px 6px" }}>ID</th>
+                                            <th style={{ padding: "8px 6px" }}>ReportFile ID</th>
+                                            <th style={{ padding: "8px 6px" }}>Downloaded By</th>
+                                            <th style={{ padding: "8px 6px" }}>Downloaded At</th>
+                                        </tr>
                                     </thead>
                                     <tbody>
-                                    {downloadLogs.map((log) => {
-                                        const id = log.logId ?? log.id;
-                                        const fileId = log.fileId ?? log.reportFileId;
-                                        const who = log.downloadedBy ?? log.download_by;
-                                        const at = log.downloadedAt ?? log.downloaded_at;
+                                        {downloadLogs.map((log) => {
+                                            const id = log.logId ?? log.id;
+                                            const fileId = log.fileId ?? log.reportFileId;
+                                            const who = log.downloadedBy ?? log.download_by;
+                                            const at = log.downloadedAt ?? log.downloaded_at;
 
-                                        return (
-                                            <tr key={id ?? `${fileId}-${at}`}>
-                                                <td style={{ padding: "8px 6px" }}>{id ?? "-"}</td>
-                                                <td style={{ padding: "8px 6px" }}>{fileId ?? "-"}</td>
-                                                <td style={{ padding: "8px 6px" }}>{who ?? "-"}</td>
-                                                <td style={{ padding: "8px 6px" }}>{at ? new Date(at).toLocaleString() : "-"}</td>
-                                            </tr>
-                                        );
-                                    })}
+                                            return (
+                                                <tr key={id ?? `${fileId}-${at}`}>
+                                                    <td style={{ padding: "8px 6px" }}>{id ?? "-"}</td>
+                                                    <td style={{ padding: "8px 6px" }}>{fileId ?? "-"}</td>
+                                                    <td style={{ padding: "8px 6px" }}>{who ?? "-"}</td>
+                                                    <td style={{ padding: "8px 6px" }}>{at ? new Date(at).toLocaleString() : "-"}</td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             )}
@@ -1013,7 +1045,7 @@ function ScheduleModal({ open, onClose, onSubmit, initial, reportTypes }) {
                 time: `${pad2(Number(time.split(":")[0]))}:${pad2(Number(time.split(":")[1]))}`,
                 daysOfWeek: repeatType === "WEEKLY" ? daysOfWeek : null,
                 dayOfMonth: repeatType === "MONTHLY" ? Number(dayOfMonth) : null,
-                requestedBy: "ADMIN",
+                //  requestedBy: "ADMIN",
             };
             onSubmit(payload);
             return;

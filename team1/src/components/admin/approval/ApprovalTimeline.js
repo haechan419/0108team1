@@ -7,7 +7,6 @@ const ApprovalTimeline = ({ logs, approvalRequest }) => {
       SUBMIT: "상신",
       APPROVE: "승인",
       REJECT: "반려",
-      REQUEST_MORE_INFO: "보완 요청",
     };
     return actionMap[action || ""] || action;
   };
@@ -17,7 +16,6 @@ const ApprovalTimeline = ({ logs, approvalRequest }) => {
       SUBMIT: "action-submit",
       APPROVE: "action-approve",
       REJECT: "action-reject",
-      REQUEST_MORE_INFO: "action-request-more-info",
     };
     return classMap[action || ""] || "";
   };

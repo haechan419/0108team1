@@ -69,11 +69,6 @@
   color: #991b1b;
 }
 
-.action-request-more-info {
-  background-color: #fef3c7;
-  color: #92400e;
-}
-
 .timeline-date {
   font-size: 12px;
   color: #6b7280;
@@ -114,10 +109,5 @@
 .timeline-dot.action-reject {
   background-color: #ef4444;
   box-shadow: 0 0 0 2px #ef4444;
-}
-
-.timeline-dot.action-request-more-info {
-  background-color: #f59e0b;
-  box-shadow: 0 0 0 2px #f59e0b;
 }
 

@@ -34,11 +34,13 @@ import UserEditPage from "./pages/admin/hr/UserEditPage";
 
 // ✅ 날아다니는 AI 버튼 (FloatingAI 컴포넌트)
 import FloatingAI from "./pages/FloatingAI";
+import { FloatingAIProvider } from "./context/FloatingAIContext";
 import MypagePage from "./pages/mypage/MypagePage";
 import AdminShopPage from "./pages/admin/shop/AdminShopPage";
 import AdminApprovalPage from "./pages/admin/AdminApprovalPage";
 import ForbiddenPage from "./pages/ForbiddenPage";
 import AdminLayout from "./components/layout/AdminLayout";
+import AttendanceManagePage from "./pages/admin/hr/AttendanceManagePage";
 
 // (기존 FloatingUI는 지금 안 쓰면 import 제거해도 됨)
 // import FloatingUI from "./components/common/FloatingUI";
@@ -54,7 +56,7 @@ function AppInner() {
     const showFloatingAI = isLogin && location.pathname !== "/";
 
     return (
-        <>
+        <FloatingAIProvider>
             {/* 페이지 라우팅 */}
             <Routes>
 
@@ -102,6 +104,8 @@ function AppInner() {
                     <Route path="approval" element={<AdminExpenseApprovalPage/>}/>
                     <Route path="approval/:id" element={<AdminExpenseApprovalDetailPage/>}/>
 
+                    <Route path="attendance" element={<AttendanceManagePage />} />
+
                     {/* 비품 재고 / 상품 관리 */}
                     <Route path="shop" element={<AdminShopPage title="[관리자] 상품/재고 관리"/>}/>
 
@@ -138,8 +142,8 @@ function AppInner() {
             </Routes>
 
             {/* ✅ 로그인 후에만, 전체 페이지에서 항상 떠있게 */}
-            {showFloatingAI && <FloatingAI/>}
-        </>
+            {showFloatingAI && <FloatingAI />}
+        </FloatingAIProvider>
     );
 }
 

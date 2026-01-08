@@ -19,13 +19,13 @@ import {
 import { Doughnut, Bar } from "react-chartjs-2";
 
 ChartJS.register(
-    ArcElement,
-    Tooltip,
-    Legend,
-    CategoryScale,
-    LinearScale,
-    BarElement,
-    Title
+  ArcElement,
+  Tooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title
 );
 
 const StatisticsDashboard = () => {
@@ -76,10 +76,10 @@ const StatisticsDashboard = () => {
 
       // 2. 차트 데이터 가공
       setDepartmentChart(
-          (response.department || []).map((d) => ({
-            name: d.departmentName || "기타",
-            amount: d.totalAmount || 0,
-          }))
+        (response.department || []).map((d) => ({
+          name: d.departmentName || "기타",
+          amount: d.totalAmount || 0,
+        }))
       );
       setCategoryChart(response.category || []);
       setOverBudgetList(response.overBudget || []);
@@ -91,10 +91,10 @@ const StatisticsDashboard = () => {
   };
 
   const formatCurrency = (val) =>
-      new Intl.NumberFormat("ko-KR", {
-        style: "currency",
-        currency: "KRW",
-      }).format(val);
+    new Intl.NumberFormat("ko-KR", {
+      style: "currency",
+      currency: "KRW",
+    }).format(val);
 
   // 차트 설정 데이터
   const deptChartData = {
@@ -127,195 +127,190 @@ const StatisticsDashboard = () => {
   };
 
   return (
-      <div className="statistics-dashboard">
-        {loading && <FetchingModal />}
+    <div className="statistics-dashboard">
+      {loading && <FetchingModal />}
 
-        {/* 상단 통계 카드 (전월 대비 표시 추가) */}
-        <div className="dashboard-grid">
-          <div className="panel stat-card">
-            <div className="stat-title">부서 총 예산 집행률</div>
-            <div className="stat-value">{summary.totalBudgetExecutionRate}%</div>
-            <div className="stat-footer">
+      {/* 상단 통계 카드 (전월 대비 표시 추가) */}
+      <div className="dashboard-grid">
+        <div className="panel stat-card">
+          <div className="stat-title">부서 총 예산 집행률</div>
+          <div className="stat-value">{summary.totalBudgetExecutionRate}%</div>
+          <div className="stat-footer">
             <span
-                className={
-                  summary.totalBudgetExecutionRate >= 80
-                      ? "trend-up"
-                      : "trend-down"
-                }
+              className={
+                summary.totalBudgetExecutionRate >= 80
+                  ? "trend-up"
+                  : "trend-down"
+              }
             >
               {summary.totalBudgetExecutionRate >= 80 ? "⚠️ 주의" : "✅ 안정적"}
             </span>
-            </div>
           </div>
+        </div>
 
-          <div className="panel stat-card">
-            <div className="stat-title">총 미결재 건수</div>
-            <div className="stat-value">{summary.totalPendingCount}건</div>
-            <div className="stat-footer text-muted">처리 대기 중</div>
+        <div className="panel stat-card">
+          <div className="stat-title">총 미결재 건수</div>
+          <div className="stat-value">{summary.totalPendingCount}건</div>
+          <div className="stat-footer text-muted">처리 대기 중</div>
+        </div>
+
+        <div className="panel stat-card">
+          <div className="stat-title">이번 달 총 지출액</div>
+          <div className="stat-value">
+            {formatCurrency(summary.monthlyTotalExpense)}
           </div>
-
-          <div className="panel stat-card">
-            <div className="stat-title">이번 달 총 지출액</div>
-            <div className="stat-value">
-              {formatCurrency(summary.monthlyTotalExpense)}
-            </div>
-            <div className="stat-footer">
+          <div className="stat-footer">
             <span
-                className={
-                  summary.monthlyExpenseChangeRate >= 0
-                      ? "trend-up"
-                      : "trend-down"
-                }
+              className={
+                summary.monthlyExpenseChangeRate >= 0
+                  ? "trend-up"
+                  : "trend-down"
+              }
             >
               {summary.monthlyExpenseChangeRate >= 0 ? "▲" : "▼"}{" "}
               {Math.abs(summary.monthlyExpenseChangeRate).toFixed(1)}%
             </span>
-              <span className="text-muted"> 전월 대비</span>
-            </div>
-          </div>
-
-          <div className="panel stat-card">
-            <div className="stat-title">예산 초과 주의 인원</div>
-            <div className="stat-value">{summary.overBudgetCount}명</div>
-            <div className="stat-footer text-muted">80% 이상 소진</div>
+            <span className="text-muted"> 전월 대비</span>
           </div>
         </div>
 
-        {/* 오늘의 결재 현황 (두 번째 코드의 핵심 기능) */}
-        <div className="panel" style={{ marginTop: "24px" }}>
-          <div className="section-title">오늘의 결재 현황</div>
-          <div
-              className="today-status-grid"
+        <div className="panel stat-card">
+          <div className="stat-title">예산 초과 주의 인원</div>
+          <div className="stat-value">{summary.overBudgetCount}명</div>
+          <div className="stat-footer text-muted">80% 이상 소진</div>
+        </div>
+      </div>
+
+      {/* 오늘의 결재 현황 (두 번째 코드의 핵심 기능) */}
+      <div className="panel" style={{ marginTop: "24px" }}>
+        <div className="section-title">오늘의 결재 현황</div>
+        <div
+          className="today-status-grid"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: "15px",
+            marginTop: "15px",
+          }}
+        >
+          {[
+            {
+              label: "신규 상신",
+              value: summary.todaySubmittedCount,
+              color: "#1f2937",
+            },
+            {
+              label: "처리 완료",
+              value: summary.todayProcessedCount,
+              color: "#1f2937",
+            },
+            {
+              label: "승인",
+              value: summary.todayApprovedCount,
+              color: "#059669",
+            },
+            {
+              label: "반려",
+              value: summary.todayRejectedCount,
+              color: "#dc2626",
+            },
+          ].map((item, i) => (
+            <div
+              key={i}
               style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(5, 1fr)",
-                gap: "15px",
-                marginTop: "15px",
+                textAlign: "center",
+                padding: "15px",
+                background: "#f9fafb",
+                borderRadius: "10px",
               }}
-          >
-            {[
-              {
-                label: "신규 상신",
-                value: summary.todaySubmittedCount,
-                color: "#1f2937",
-              },
-              {
-                label: "처리 완료",
-                value: summary.todayProcessedCount,
-                color: "#1f2937",
-              },
-              {
-                label: "승인",
-                value: summary.todayApprovedCount,
-                color: "#059669",
-              },
-              {
-                label: "반려",
-                value: summary.todayRejectedCount,
-                color: "#dc2626",
-              },
-              {
-                label: "보완요청",
-                value: summary.todayRequestMoreInfoCount,
-                color: "#d97706",
-              },
-            ].map((item, i) => (
-                <div
-                    key={i}
-                    style={{
-                      textAlign: "center",
-                      padding: "15px",
-                      background: "#f9fafb",
-                      borderRadius: "10px",
-                    }}
-                >
-                  <div
-                      style={{
-                        fontSize: "12px",
-                        color: "#6b7280",
-                        marginBottom: "5px",
-                      }}
-                  >
-                    {item.label}
-                  </div>
-                  <div
-                      style={{
-                        fontSize: "20px",
-                        fontWeight: "700",
-                        color: item.color,
-                      }}
-                  >
-                    {item.value}건
-                  </div>
-                </div>
-            ))}
+            >
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: "#6b7280",
+                  marginBottom: "5px",
+                }}
+              >
+                {item.label}
+              </div>
+              <div
+                style={{
+                  fontSize: "20px",
+                  fontWeight: "700",
+                  color: item.color,
+                }}
+              >
+                {item.value}건
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 차트 영역 */}
+      <div className="dashboard-row" style={{ marginTop: "24px" }}>
+        <div className="panel" style={{ height: "400px" }}>
+          <div className="section-title">부서별 지출 비중</div>
+          <div style={{ height: "300px" }}>
+            {departmentChart.length > 0 ? (
+              <Doughnut
+                data={deptChartData}
+                options={{ maintainAspectRatio: false }}
+              />
+            ) : (
+              "데이터 없음"
+            )}
           </div>
         </div>
-
-        {/* 차트 영역 */}
-        <div className="dashboard-row" style={{ marginTop: "24px" }}>
-          <div className="panel" style={{ height: "400px" }}>
-            <div className="section-title">부서별 지출 비중</div>
-            <div style={{ height: "300px" }}>
-              {departmentChart.length > 0 ? (
-                  <Doughnut
-                      data={deptChartData}
-                      options={{ maintainAspectRatio: false }}
-                  />
-              ) : (
-                  "데이터 없음"
-              )}
-            </div>
-          </div>
-          <div className="panel" style={{ height: "400px" }}>
-            <div className="section-title">항목별 지출 비중</div>
-            <div style={{ height: "300px" }}>
-              {categoryChart.length > 0 ? (
-                  <Bar
-                      data={catChartData}
-                      options={{ maintainAspectRatio: false }}
-                  />
-              ) : (
-                  "데이터 없음"
-              )}
-            </div>
+        <div className="panel" style={{ height: "400px" }}>
+          <div className="section-title">항목별 지출 비중</div>
+          <div style={{ height: "300px" }}>
+            {categoryChart.length > 0 ? (
+              <Bar
+                data={catChartData}
+                options={{ maintainAspectRatio: false }}
+              />
+            ) : (
+              "데이터 없음"
+            )}
           </div>
         </div>
+      </div>
 
-        {/* 예산 초과 리스트 */}
-        <div className="panel" style={{ marginTop: "24px" }}>
-          <div className="section-title">예산 초과 주의 인원 리스트</div>
-          <table className="dashboard-table">
-            <thead>
+      {/* 예산 초과 리스트 */}
+      <div className="panel" style={{ marginTop: "24px" }}>
+        <div className="section-title">예산 초과 주의 인원 리스트</div>
+        <table className="dashboard-table">
+          <thead>
             <tr>
               <th>사원명</th>
               <th>부서</th>
               <th>예산 소진율</th>
               <th>잔여 예산</th>
             </tr>
-            </thead>
-            <tbody>
+          </thead>
+          <tbody>
             {overBudgetList.map((p, i) => (
-                <tr key={i}>
-                  <td>{p.name}</td>
-                  <td>{p.department}</td>
-                  <td>
+              <tr key={i}>
+                <td>{p.name}</td>
+                <td>{p.department}</td>
+                <td>
                   <span
-                      style={{
-                        fontWeight: "700",
-                        color: p.executionRate >= 80 ? "#e11d48" : "#333",
-                      }}
+                    style={{
+                      fontWeight: "700",
+                      color: p.executionRate >= 80 ? "#e11d48" : "#333",
+                    }}
                   >
                     {p.executionRate}%
                   </span>
-                  </td>
-                  <td>{formatCurrency(p.remaining)}</td>
-                </tr>
+                </td>
+                <td>{formatCurrency(p.remaining)}</td>
+              </tr>
             ))}
-            </tbody>
-          </table>
-        </div>
+          </tbody>
+        </table>
       </div>
+    </div>
   );
 };
 

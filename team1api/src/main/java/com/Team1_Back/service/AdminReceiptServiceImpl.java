@@ -74,11 +74,11 @@ public class AdminReceiptServiceImpl implements AdminReceiptService {
                 .filter(dto -> dto != null)
                 .collect(Collectors.toList());
 
-        return PageResponseDTO.<ReceiptDTO>withAll()
-                .dtoList(dtoList)
-                .totalCount(expensePage.getTotalElements())
-                .pageRequestDTO(pageRequestDTO)
-                .build();
+        return PageResponseDTO.of(
+                dtoList,
+                pageRequestDTO,
+                expensePage.getTotalElements()
+        );
     }
 
     @Override

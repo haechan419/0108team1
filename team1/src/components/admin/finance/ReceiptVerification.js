@@ -25,7 +25,6 @@ const ReceiptVerification = ({ receiptId, onVerify }) => {
         <select value={action} onChange={(e) => setAction(e.target.value)} required>
           <option value="APPROVE">승인</option>
           <option value="REJECT">반려</option>
-          <option value="REQUEST_MORE_INFO">보완요청</option>
         </select>
       </div>
 

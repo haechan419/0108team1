@@ -118,12 +118,11 @@ public class ApprovalServiceImpl implements ApprovalService {
                 });
             }
         }
-
-        return PageResponseDTO.<ApprovalRequestDTO>withAll()
-                .dtoList(dtoList)
-                .totalCount(totalCount)
-                .pageRequestDTO(pageRequestDTO)
-                .build();
+        return PageResponseDTO.of(
+                dtoList,
+                pageRequestDTO,
+                totalCount
+        );
     }
 
     @Override

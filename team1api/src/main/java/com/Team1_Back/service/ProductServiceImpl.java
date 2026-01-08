@@ -15,7 +15,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -28,40 +27,39 @@ public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
 
-    // 1. 목록 조회 (모든 상품 무조건 노출)
+    // 1. 목록 조회 (✨ 카테고리 필터링 적용 완료!)
     @Override
-    @Transactional(readOnly = true)
     public PageResponseDTO<ProductDTO> getList(PageRequestDTO pageRequestDTO) {
 
-        // 정렬 조건: 최신순(pno 내림차순)
+        // 정렬 조건: 순서(ord) 오름차순 -> 최신순(pno) 내림차순
         Pageable pageable = PageRequest.of(
-                pageRequestDTO.getPage() < 0 ? 0 : pageRequestDTO.getPage() - 1, // 0보다 작으면 0으로 보정
+                pageRequestDTO.getPage() - 1,
                 pageRequestDTO.getSize(),
-                Sort.by("ord").ascending() // 
+                Sort.by("ord").ascending().and(Sort.by("pno").descending())
         );
 
-        // 검색 분기 처리
+        // ✨ 검색 분기 처리 (여기가 수정되었습니다!)
         Page<Product> result;
         String category = pageRequestDTO.getCategory();
 
-        // 1) 카테고리 필터링 ("All"이 아니고 값이 있을 때)
+        // 1) 카테고리 값이 있고, "All"이 아니고, 비어있지 않다면 -> 카테고리 검색
         if(category != null && !category.equals("All") && !category.isEmpty()) {
             result = productRepository.findByCategory(category, pageable);
         } else {
-            // 2) 전체 검색 (조건 없는 selectList 호출)
+            // 2) 아니면 -> 전체 검색 (Repository의 selectList 사용)
+            // (findAll 대신 selectList를 써야 delFlag=false 조건 등이 적용됩니다)
             result = productRepository.selectList(pageable);
         }
 
-        // 결과 변환 (Entity -> DTO)
         List<ProductDTO> dtoList = result.getContent().stream()
                 .map(product -> entityToDTO(product))
                 .collect(Collectors.toList());
 
-        return PageResponseDTO.<ProductDTO>withAll()
-                .dtoList(dtoList)
-                .totalCount(result.getTotalElements())
-                .pageRequestDTO(pageRequestDTO)
-                .build();
+        return PageResponseDTO.of(
+                dtoList,
+                pageRequestDTO,
+                result.getTotalElements()
+        );
     }
 
     // 2. 등록
@@ -80,22 +78,28 @@ public class ProductServiceImpl implements ProductService {
         return entityToDTO(product);
     }
 
-    // 4. 수정
+    // 4. 수정 (재고 수정 포함)
     @Override
     public void modify(ProductDTO productDTO) {
         Optional<Product> result = productRepository.findById(productDTO.getPno());
         Product product = result.orElseThrow();
 
+        // 기존 정보 수정
         product.changeName(productDTO.getPname());
         product.changeDesc(productDTO.getPdesc());
         product.changePrice(productDTO.getPrice());
         product.changeCategory(productDTO.getCategory());
-        product.changeStock(productDTO.getStockQuantity());
+        
+        // 재고 수정
+        product.changeStock(productDTO.getStockQuantity()); 
 
+        // 파일 수정 로직
         product.clearList();
         List<String> uploadFileNames = productDTO.getUploadFileNames();
-        if(uploadFileNames != null && !uploadFileNames.isEmpty()){
-            uploadFileNames.forEach(product::addImageString);
+        if(uploadFileNames != null && uploadFileNames.size() > 0){
+            uploadFileNames.stream().forEach(uploadName -> {
+                product.addImageString(uploadName);
+            });
         }
         productRepository.save(product);
     }
@@ -106,21 +110,21 @@ public class ProductServiceImpl implements ProductService {
         productRepository.deleteById(pno);
     }
 
-    // 6. 순서 변경
+    // 6. 순서 변경 구현
     @Override
     public void changeOrder(List<Long> pnoList) {
         for (int i = 0; i < pnoList.size(); i++) {
-            final int num = i; // ✨ [핵심] i를 'final' 변수에 담아서 고정시킴
-            
             Long pno = pnoList.get(i);
-            productRepository.findById(pno).ifPresent(product -> {
-                product.changeOrd(num); // ✨ i 대신 num을 사용하면 에러 끝!
+            Optional<Product> result = productRepository.findById(pno);
+            if (result.isPresent()) {
+                Product product = result.get();
+                product.changeOrd(i); // i번째 순서로 저장 (0, 1, 2...)
                 productRepository.save(product);
-            });
+            }
         }
     }
 
-    // 변환 메서드들 (status 빨간 줄 해결)
+    // 변환 메서드들 (Entity <-> DTO)
     private ProductDTO entityToDTO(Product product){
         ProductDTO productDTO = ProductDTO.builder()
                 .pno(product.getPno())
@@ -130,20 +134,16 @@ public class ProductServiceImpl implements ProductService {
                 .category(product.getCategory())
                 .stockQuantity(product.getStockQuantity())
                 .delFlag(product.isDelFlag())
-                .status(product.isStatus()) // ✨ 1, 2단계 적용하면 이제 인식됨!
                 .build();
-        
-        // ... 이미지 처리 로직 (그대로 유지) ...
-        List<String> fileNameList = new ArrayList<>();
-        if (product.getImageList() != null && !product.getImageList().isEmpty()) {
-            fileNameList = product.getImageList().stream()
-                    .map(ProductImage::getFileName)
-                    .collect(Collectors.toList());
-        } else {
-            fileNameList.add("default.jpg");
-        }
-        productDTO.setUploadFileNames(fileNameList);
 
+        List<ProductImage> imageList = product.getImageList();
+        if(imageList == null || imageList.isEmpty()){
+            return productDTO;
+        }
+
+        List<String> fileNameList = imageList.stream().map(productImage ->
+                productImage.getFileName()).toList();
+        productDTO.setUploadFileNames(fileNameList);
         return productDTO;
     }
 
@@ -156,14 +156,15 @@ public class ProductServiceImpl implements ProductService {
                 .category(productDTO.getCategory())
                 .stockQuantity(productDTO.getStockQuantity())
                 .delFlag(productDTO.isDelFlag())
-                .status(productDTO.isStatus()) // ✨ 여기도 해결됨
                 .build();
 
-        // ... 이미지 처리 로직 (그대로 유지) ...
         List<String> uploadFileNames = productDTO.getUploadFileNames();
-        if(uploadFileNames != null){
-            uploadFileNames.forEach(product::addImageString);
+        if(uploadFileNames == null){
+            return product;
         }
+        uploadFileNames.stream().forEach(uploadName -> {
+            product.addImageString(uploadName);
+        });
         return product;
     }
 }
