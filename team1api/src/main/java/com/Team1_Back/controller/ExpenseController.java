@@ -63,10 +63,13 @@ public class ExpenseController {
         }
 
         Long userId = principal.getId();
-        log.info("지출 목록 조회 요청 - userId: " + userId + ", status: " + status + ", startDate: " + startDate + ", endDate: " + endDate);
-        PageResponseDTO<ExpenseDTO> response = expenseService.getList(userId, pageRequestDTO, status, startDate, endDate);
-        log.info("지출 목록 조회 결과 - 총 " + response.getContent().size() + "건");
-        return response;
+//        log.info("지출 목록 조회 요청 - userId: " + userId + ", status: " + status + ", startDate: " + startDate + ", endDate: " + endDate);
+//        PageResponseDTO<ExpenseDTO> response = expenseService.getList(userId, pageRequestDTO, status, startDate, endDate);
+//        log.info("지출 목록 조회 결과 - 총 " + response.getContent().size() + "건");
+//        return response;
+
+        // 유진님 추가
+        return expenseService.getList(userId, pageRequestDTO, status, startDate, endDate);
     }
 
     /**

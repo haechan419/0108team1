@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from "react";
 import {useDispatch, useSelector} from "react-redux";
-import {useNavigate, useParams} from "react-router-dom";
+import {useNavigate, useParams, useSearchParams} from "react-router-dom";
 import {createExpense, updateExpense, fetchExpense} from "../../slices/expenseSlice";
 import ExpenseForm from "../../components/finance/ExpenseForm";
 import "./ExpenseAddPage.css";
@@ -10,6 +10,7 @@ const ExpenseAddPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const {id} = useParams();
+    const [searchParams] = useSearchParams();
     const isEditMode = !!id;
 
     const [loading, setLoading] = useState(isEditMode);
@@ -31,14 +32,17 @@ const ExpenseAddPage = () => {
         }
     }, [id, isEditMode, dispatch, navigate]);
 
-    const handleSubmit = async (data) => {
+    const handleSubmit = async (data, tempExpenseId = null) => {
         try {
-            if (isEditMode) {
-                // 수정 모드
-                const result = await dispatch(updateExpense({id, data})).unwrap();
+            // ✅ 수정: tempExpenseId가 있으면 기존 임시 지출 내역 업데이트
+            const expenseIdToUpdate = tempExpenseId || (isEditMode ? id : null);
+
+            if (expenseIdToUpdate) {
+                // 임시 지출 내역 업데이트 또는 수정 모드
+                const result = await dispatch(updateExpense({id: expenseIdToUpdate, data})).unwrap();
                 return result;
             } else {
-                // 등록 모드
+                // 등록 모드 + 임시 지출 내역 없음: 새로 생성
                 const result = await dispatch(createExpense(data)).unwrap();
                 return result;
             }
@@ -50,12 +54,19 @@ const ExpenseAddPage = () => {
     };
 
     const handleSubmitComplete = () => {
-        // 영수증 업로드 완료 후 목록으로 이동
-        navigate("/receipt/expenses");
+        const queryString = searchParams.toString();
+        navigate(`/receipt/expenses${queryString ? `?${queryString}` : ""}`);
+        // 목록 페이지가 마운트되면 자동으로 fetchExpenses가 호출됨
     };
 
     const handleCancel = () => {
-        navigate("/receipt/expenses");
+        const queryString = searchParams.toString();
+        // 수정 모드일 때는 상세 페이지로, 등록 모드일 때는 목록으로
+        if (isEditMode && id) {
+            navigate(`/receipt/expenses/${id}${queryString ? `?${queryString}` : ""}`);
+        } else {
+            navigate(`/receipt/expenses${queryString ? `?${queryString}` : ""}`);
+        }
     };
 
     if (loading) {

@@ -404,7 +404,7 @@ export default function ReportAnalyticsPage() {
                     format: effectiveFormat,
 
                     // ✅ 여기 박는거임
-                    departmentName: role === "ADMIN" && dataScope === "DEPT" ? dept : null,
+                    department: role === "ADMIN" && dataScope === "DEPT" ? dept : null,
                 },
             };
 

@@ -6,6 +6,8 @@ import "../../styles/layout.css";
 import NotificationBell from "../common/NotificationBell";
 import ChatDrawer from "../chat/ChatDrawer";
 import { chatApi } from "../../api/chatApi";
+import FloatingAI from "../../pages/FloatingAI"; //
+
 
 export default function Topbar() {
     const navigate = useNavigate();
@@ -173,6 +175,19 @@ export default function Topbar() {
                     </div>
                 </div>
             </header>
+            
+             {/*한해찬*/}
+            <FloatingAI
+                roomId={activeRoomId}
+                onOpenRoom={(rid) => {
+                    setActiveRoomId(String(rid));
+                    setChatOpen(true);
+                    setRoomsOpen(false);
+                    setAutoOpenNewChat(false);
+                }}
+            />
+
+
 
             <ChatDrawer
                 open={chatOpen}

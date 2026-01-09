@@ -48,6 +48,46 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             @Param("endDate") LocalDate endDate,
             Pageable pageable);
 
+    // 사용자별 + 기간별 지출 내역 조회 - 시작일만 (상신일 기준: createdAt)
+    @EntityGraph(attributePaths = { "writer" })
+    @Query("SELECT e FROM Expense e WHERE e.writer.id = :userId " +
+            "AND DATE(e.createdAt) >= :startDate")
+    Page<Expense> findByUserIdAndStartDate(
+            @Param("userId") Long userId,
+            @Param("startDate") LocalDate startDate,
+            Pageable pageable);
+
+    // 사용자별 + 기간별 지출 내역 조회 - 종료일만 (상신일 기준: createdAt)
+    @EntityGraph(attributePaths = { "writer" })
+    @Query("SELECT e FROM Expense e WHERE e.writer.id = :userId " +
+            "AND DATE(e.createdAt) <= :endDate")
+    Page<Expense> findByUserIdAndEndDate(
+            @Param("userId") Long userId,
+            @Param("endDate") LocalDate endDate,
+            Pageable pageable);
+
+    // 사용자별 + 상태별 + 시작일만 (상신일 기준: createdAt)
+    @EntityGraph(attributePaths = { "writer" })
+    @Query("SELECT e FROM Expense e WHERE e.writer.id = :userId " +
+            "AND e.status = :status " +
+            "AND DATE(e.createdAt) >= :startDate")
+    Page<Expense> findByUserIdAndStatusAndStartDate(
+            @Param("userId") Long userId,
+            @Param("status") ApprovalStatus status,
+            @Param("startDate") LocalDate startDate,
+            Pageable pageable);
+
+    // 사용자별 + 상태별 + 종료일만 (상신일 기준: createdAt)
+    @EntityGraph(attributePaths = { "writer" })
+    @Query("SELECT e FROM Expense e WHERE e.writer.id = :userId " +
+            "AND e.status = :status " +
+            "AND DATE(e.createdAt) <= :endDate")
+    Page<Expense> findByUserIdAndStatusAndEndDate(
+            @Param("userId") Long userId,
+            @Param("status") ApprovalStatus status,
+            @Param("endDate") LocalDate endDate,
+            Pageable pageable);
+
     // 사용자 ID와 지출 ID로 조회 (권한 확인용)
     @EntityGraph(attributePaths = { "writer" })
     @Query("SELECT e FROM Expense e WHERE e.id = :id AND e.writer.id = :writerId")

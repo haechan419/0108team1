@@ -212,5 +212,145 @@
     background: #f3f4f6;
 }
 
+/* attachments */
+.kcAttList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.kcAttCard {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(0,0,0,0.08);
+    background: rgba(255,255,255,0.9);
+    max-width: 320px;
+}
+
+.kcRow.me .kcAttCard {
+    margin-left: auto;
+}
+
+.kcAttIcon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.06);
+    flex: 0 0 auto;
+}
+
+.kcAttThumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(0,0,0,0.06);
+    flex: 0 0 auto;
+}
+
+.kcAttThumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.kcAttMeta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.kcAttName {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kcAttSub {
+    font-size: 11px;
+    color: rgba(0,0,0,0.55);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kcAttAction {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(0,0,0,0.55);
+    flex: 0 0 auto;
+}
+
+.kcAttachBtn {
+    border: none;
+    background: transparent;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 6px 8px;
+    opacity: 0.85;
+}
+
+.kcAttachBtn:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
+.kcInputStack {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+}
+
+.kcFileChips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.kcFileChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.06);
+    max-width: 240px;
+}
+
+.kcFileName {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 190px;
+}
+
+.kcFileRemove {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    opacity: 0.7;
+}
+.kcFileRemove:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
+
 
 

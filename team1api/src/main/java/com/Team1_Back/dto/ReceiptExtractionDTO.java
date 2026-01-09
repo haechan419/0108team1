@@ -27,6 +27,8 @@ public class ReceiptExtractionDTO {
 
     private String extractedCategory;
 
+    private String extractedDescription;
+
     private BigDecimal confidence;
 
     private String extractedJson;

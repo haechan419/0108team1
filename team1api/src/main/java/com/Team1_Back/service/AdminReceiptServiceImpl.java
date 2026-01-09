@@ -74,11 +74,11 @@ public class AdminReceiptServiceImpl implements AdminReceiptService {
                 .filter(dto -> dto != null)
                 .collect(Collectors.toList());
 
-        return PageResponseDTO.<ReceiptDTO>of(
+        return PageResponseDTO.of(
                 dtoList,
                 pageRequestDTO,
-                expensePage.getTotalElements());
-
+                expensePage.getTotalElements()
+        );
     }
 
     @Override
@@ -100,8 +100,7 @@ public class AdminReceiptServiceImpl implements AdminReceiptService {
         String fileUrl = receiptUpload.getFileUrl();
         Path filePath = Paths.get(fileUrl);
 
-        // CustomFileUtil.getFileAsResource()가 NoSuchElementException을 던지면 그대로 전파
-        // (ControllerAdvice가 404로 처리)
+        // CustomFileUtil.getFileAsResource()가 NoSuchElementException을 던지면 그대로 전파 (ControllerAdvice가 404로 처리)
         return customFileUtil.getFileAsResource(filePath);
     }
 
@@ -113,10 +112,9 @@ public class AdminReceiptServiceImpl implements AdminReceiptService {
             throw new java.util.NoSuchElementException("영수증을 찾을 수 없습니다.");
         }
 
-        // OCR 기능이 아직 구현되지 않았으므로, OCR 데이터가 없을 때는 NoSuchElementException 던짐
+        // OCR 추출 결과 조회 (없을 경우 예외 발생)
         ReceiptAiExtraction extraction = receiptAiExtractionRepository.findByReceiptId(id)
-                .orElseThrow(
-                        () -> new java.util.NoSuchElementException("OCR 추출 결과를 찾을 수 없습니다. OCR 기능이 아직 구현되지 않았습니다."));
+                .orElseThrow(() -> new java.util.NoSuchElementException("OCR 추출 결과를 찾을 수 없습니다. 영수증 업로드 후 OCR 처리가 완료되지 않았거나 실패한 것 같습니다."));
 
         return com.Team1_Back.dto.ReceiptExtractionDTO.builder()
                 .receiptId(id)
@@ -217,10 +215,9 @@ public class AdminReceiptServiceImpl implements AdminReceiptService {
 
     /**
      * ReceiptUpload 엔티티를 ReceiptDTO로 변환합니다 (하이브리드 방식).
-     * 
-     * <p>
-     * ModelMapper로 기본 필드를 매핑하고, 연관 엔티티와 Repository 조회가 필요한 부분은 수동으로 처리합니다.
-     * 
+     *
+     * <p>ModelMapper로 기본 필드를 매핑하고, 연관 엔티티와 Repository 조회가 필요한 부분은 수동으로 처리합니다.
+     *
      * @param entity 변환할 ReceiptUpload 엔티티
      * @return ReceiptDTO (필수 연관 엔티티가 null이면 null 반환)
      */
@@ -257,6 +254,7 @@ public class AdminReceiptServiceImpl implements AdminReceiptService {
             dto.setExtractedAmount(extraction.getExtractedAmount());
             dto.setExtractedMerchant(extraction.getExtractedMerchant());
             dto.setExtractedCategory(extraction.getExtractedCategory());
+            dto.setExtractedDescription(extraction.getExtractedDescription());
             dto.setConfidence(extraction.getConfidence());
             dto.setExtractionCreatedAt(extraction.getCreatedAt());
         }
@@ -283,11 +281,10 @@ public class AdminReceiptServiceImpl implements AdminReceiptService {
 
     /**
      * Expense 엔티티를 ReceiptDTO로 변환합니다 (하이브리드 방식, 영수증이 없어도 처리 가능).
-     * 
-     * <p>
-     * ModelMapper로 기본 필드를 매핑하고, 연관 엔티티, Enum 변환, Repository 조회가 필요한 부분은 수동으로 처리합니다.
+     *
+     * <p>ModelMapper로 기본 필드를 매핑하고, 연관 엔티티, Enum 변환, Repository 조회가 필요한 부분은 수동으로 처리합니다.
      * 영수증이 없는 경우에도 Expense 정보만으로 ReceiptDTO를 생성할 수 있습니다.
-     * 
+     *
      * @param expense 변환할 Expense 엔티티
      * @return ReceiptDTO (필수 필드가 null이면 null 반환)
      */
@@ -315,8 +312,7 @@ public class AdminReceiptServiceImpl implements AdminReceiptService {
 
         // 4. Repository 조회가 필요한 데이터 (수동 처리)
         // 영수증이 있는지 확인
-        Optional<com.Team1_Back.domain.ReceiptUpload> receiptOpt = receiptUploadRepository
-                .findByExpenseId(expense.getId());
+        Optional<com.Team1_Back.domain.ReceiptUpload> receiptOpt = receiptUploadRepository.findByExpenseId(expense.getId());
 
         // 영수증이 있으면 영수증 정보 포함
         if (receiptOpt.isPresent()) {
@@ -330,8 +326,7 @@ public class AdminReceiptServiceImpl implements AdminReceiptService {
             dto.setMimeType(receiptDto.getMimeType());
 
             // AI 추출 결과 추가
-            Optional<ReceiptAiExtraction> extractionOpt = receiptAiExtractionRepository
-                    .findByReceiptId(receipt.getId());
+            Optional<ReceiptAiExtraction> extractionOpt = receiptAiExtractionRepository.findByReceiptId(receipt.getId());
             if (extractionOpt.isPresent()) {
                 ReceiptAiExtraction extraction = extractionOpt.get();
                 dto.setExtractionId(extraction.getId());
@@ -370,3 +365,4 @@ public class AdminReceiptServiceImpl implements AdminReceiptService {
         return dto;
     }
 }
+

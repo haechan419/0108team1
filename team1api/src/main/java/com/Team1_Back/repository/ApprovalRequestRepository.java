@@ -152,6 +152,100 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             @Param("endDate") LocalDate endDate,
             Pageable pageable);
 
+    // 전체 + 시작일만 조회
+    @Query(value = "SELECT ar.* FROM approval_request ar " +
+           "WHERE DATE(ar.created_at) >= :startDate " +
+           "ORDER BY ar.created_at DESC, ar.updated_at DESC",
+           nativeQuery = true,
+           countQuery = "SELECT COUNT(*) FROM approval_request ar WHERE DATE(ar.created_at) >= :startDate")
+    Page<ApprovalRequest> findAllByStartDate(
+            @Param("startDate") LocalDate startDate,
+            Pageable pageable);
+
+    // 전체 + 종료일만 조회
+    @Query(value = "SELECT ar.* FROM approval_request ar " +
+           "WHERE DATE(ar.created_at) <= :endDate " +
+           "ORDER BY ar.created_at DESC, ar.updated_at DESC",
+           nativeQuery = true,
+           countQuery = "SELECT COUNT(*) FROM approval_request ar WHERE DATE(ar.created_at) <= :endDate")
+    Page<ApprovalRequest> findAllByEndDate(
+            @Param("endDate") LocalDate endDate,
+            Pageable pageable);
+
+    // 요청 타입 + 상태 + 시작일만 조회
+    @Query(value = "SELECT ar.* FROM approval_request ar " +
+           "WHERE ar.request_type = :requestType AND ar.status_snapshot = :statusSnapshot " +
+           "AND DATE(ar.created_at) >= :startDate " +
+           "ORDER BY ar.created_at DESC, ar.updated_at DESC",
+           nativeQuery = true,
+           countQuery = "SELECT COUNT(*) FROM approval_request ar WHERE ar.request_type = :requestType AND ar.status_snapshot = :statusSnapshot AND DATE(ar.created_at) >= :startDate")
+    Page<ApprovalRequest> findByRequestTypeAndStatusSnapshotAndStartDate(
+            @Param("requestType") String requestType,
+            @Param("statusSnapshot") String statusSnapshot,
+            @Param("startDate") LocalDate startDate,
+            Pageable pageable);
+
+    // 요청 타입 + 상태 + 종료일만 조회
+    @Query(value = "SELECT ar.* FROM approval_request ar " +
+           "WHERE ar.request_type = :requestType AND ar.status_snapshot = :statusSnapshot " +
+           "AND DATE(ar.created_at) <= :endDate " +
+           "ORDER BY ar.created_at DESC, ar.updated_at DESC",
+           nativeQuery = true,
+           countQuery = "SELECT COUNT(*) FROM approval_request ar WHERE ar.request_type = :requestType AND ar.status_snapshot = :statusSnapshot AND DATE(ar.created_at) <= :endDate")
+    Page<ApprovalRequest> findByRequestTypeAndStatusSnapshotAndEndDate(
+            @Param("requestType") String requestType,
+            @Param("statusSnapshot") String statusSnapshot,
+            @Param("endDate") LocalDate endDate,
+            Pageable pageable);
+
+    // 요청 타입 + 시작일만 조회
+    @Query(value = "SELECT ar.* FROM approval_request ar " +
+           "WHERE ar.request_type = :requestType " +
+           "AND DATE(ar.created_at) >= :startDate " +
+           "ORDER BY ar.created_at DESC, ar.updated_at DESC",
+           nativeQuery = true,
+           countQuery = "SELECT COUNT(*) FROM approval_request ar WHERE ar.request_type = :requestType AND DATE(ar.created_at) >= :startDate")
+    Page<ApprovalRequest> findByRequestTypeAndStartDate(
+            @Param("requestType") String requestType,
+            @Param("startDate") LocalDate startDate,
+            Pageable pageable);
+
+    // 요청 타입 + 종료일만 조회
+    @Query(value = "SELECT ar.* FROM approval_request ar " +
+           "WHERE ar.request_type = :requestType " +
+           "AND DATE(ar.created_at) <= :endDate " +
+           "ORDER BY ar.created_at DESC, ar.updated_at DESC",
+           nativeQuery = true,
+           countQuery = "SELECT COUNT(*) FROM approval_request ar WHERE ar.request_type = :requestType AND DATE(ar.created_at) <= :endDate")
+    Page<ApprovalRequest> findByRequestTypeAndEndDate(
+            @Param("requestType") String requestType,
+            @Param("endDate") LocalDate endDate,
+            Pageable pageable);
+
+    // 상태 + 시작일만 조회
+    @Query(value = "SELECT ar.* FROM approval_request ar " +
+           "WHERE ar.status_snapshot = :statusSnapshot " +
+           "AND DATE(ar.created_at) >= :startDate " +
+           "ORDER BY ar.created_at DESC, ar.updated_at DESC",
+           nativeQuery = true,
+           countQuery = "SELECT COUNT(*) FROM approval_request ar WHERE ar.status_snapshot = :statusSnapshot AND DATE(ar.created_at) >= :startDate")
+    Page<ApprovalRequest> findByStatusSnapshotAndStartDate(
+            @Param("statusSnapshot") String statusSnapshot,
+            @Param("startDate") LocalDate startDate,
+            Pageable pageable);
+
+    // 상태 + 종료일만 조회
+    @Query(value = "SELECT ar.* FROM approval_request ar " +
+           "WHERE ar.status_snapshot = :statusSnapshot " +
+           "AND DATE(ar.created_at) <= :endDate " +
+           "ORDER BY ar.created_at DESC, ar.updated_at DESC",
+           nativeQuery = true,
+           countQuery = "SELECT COUNT(*) FROM approval_request ar WHERE ar.status_snapshot = :statusSnapshot AND DATE(ar.created_at) <= :endDate")
+    Page<ApprovalRequest> findByStatusSnapshotAndEndDate(
+            @Param("statusSnapshot") String statusSnapshot,
+            @Param("endDate") LocalDate endDate,
+            Pageable pageable);
+
     // 오늘의 미결재 건수 조회 (ApprovalRequest 테이블 기준)
     // DATE() 함수와 CURDATE()를 사용하여 날짜만 비교 (시간 무시)
     @Query(value = 
