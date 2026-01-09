@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.FileOutputStream;
 import java.nio.file.Path;
-
 @Component
 public class ExcelReportGenerator {
 
