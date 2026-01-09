@@ -19,7 +19,7 @@ const AdminFinancePage = () => {
   const [expense, setExpense] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
-  const [actionType, setActionType] = useState(null); // "APPROVE", "REJECT"
+  const [actionType, setActionType] = useState(null); // "APPROVE", "REJECT", "REQUEST_MORE_INFO"
   const [actionReason, setActionReason] = useState("");
 
   useEffect(() => {
@@ -34,14 +34,10 @@ const AdminFinancePage = () => {
         size: 15,
         status: statusFilter || undefined,
       });
-      // REQUEST_MORE_INFO 상태는 프론트엔드에서 필터링하여 표시하지 않음
-      const receiptsList = (response.dtoList || []).filter(
-        (receipt) => receipt.status !== "REQUEST_MORE_INFO"
-      );
-      setReceipts(receiptsList);
+      setReceipts(response.dtoList || []);
       setPageResponse(response);
-      if (receiptsList && receiptsList.length > 0) {
-        setSelectedReceipt(receiptsList[0]);
+      if (response.dtoList && response.dtoList.length > 0) {
+        setSelectedReceipt(response.dtoList[0]);
       }
     } catch (error) {
       console.error("영수증 목록 조회 실패:", error);
@@ -117,15 +113,12 @@ const AdminFinancePage = () => {
   };
 
   const getStatusLabel = (status) => {
-    // REQUEST_MORE_INFO 상태는 표시하지 않음
-    if (status === "REQUEST_MORE_INFO") {
-      return "";
-    }
     const statusMap = {
       DRAFT: "임시저장",
       SUBMITTED: "상신",
-      APPROVED: "승인",
+      APPROVED: "결재완료",
       REJECTED: "반려",
+      REQUEST_MORE_INFO: "보완요청",
     };
     return statusMap[status || ""] || status;
   };
@@ -136,13 +129,15 @@ const AdminFinancePage = () => {
       SUBMITTED: "status-submitted",
       APPROVED: "status-approved",
       REJECTED: "status-rejected",
+      REQUEST_MORE_INFO: "status-request-more-info",
     };
     return classMap[status || ""] || "";
   };
 
   // 상태별 버튼 활성화 조건
-  const canApprove = selectedReceipt?.status === "SUBMITTED";
-  const canReject = selectedReceipt?.status === "SUBMITTED";
+  const canApprove = selectedReceipt?.status === "SUBMITTED" || selectedReceipt?.status === "REQUEST_MORE_INFO";
+  const canReject = selectedReceipt?.status === "SUBMITTED" || selectedReceipt?.status === "REQUEST_MORE_INFO";
+  const canRequestMoreInfo = selectedReceipt?.status === "SUBMITTED";
 
   // 액션 모달 열기
   const handleOpenActionModal = (type) => {
@@ -158,12 +153,12 @@ const AdminFinancePage = () => {
     setActionReason("");
   };
 
-  // 승인/반려 처리
+  // 승인/반려/보완요청 처리
   const handleActionConfirm = async () => {
     if (!selectedReceipt || !actionType) return;
 
-    // 반려는 사유 필수
-    if (actionType === "REJECT" && !actionReason.trim()) {
+    // 반려와 보완요청은 사유 필수
+    if ((actionType === "REJECT" || actionType === "REQUEST_MORE_INFO") && !actionReason.trim()) {
       alert("사유를 입력해주세요.");
       return;
     }
@@ -198,7 +193,7 @@ const AdminFinancePage = () => {
       }
     } catch (error) {
       console.error("액션 처리 실패:", error);
-      alert(`${actionType === "APPROVE" ? "승인" : "반려"} 처리에 실패했습니다.`);
+      alert(`${actionType === "APPROVE" ? "승인" : actionType === "REJECT" ? "반려" : "보완 요청"} 처리에 실패했습니다.`);
     }
   };
 
@@ -238,8 +233,9 @@ const AdminFinancePage = () => {
             >
               <option value="">전체</option>
               <option value="SUBMITTED">상신</option>
-              <option value="APPROVED">승인</option>
+              <option value="APPROVED">결재완료</option>
               <option value="REJECTED">반려</option>
+              <option value="REQUEST_MORE_INFO">보완요청</option>
             </select>
           </div>
           <div className="filter-item">
@@ -446,6 +442,14 @@ const AdminFinancePage = () => {
                 반려
               </button>
               <button
+                className="btn btn-warning"
+                disabled={!canRequestMoreInfo}
+                onClick={() => handleOpenActionModal("REQUEST_MORE_INFO")}
+                title={!canRequestMoreInfo ? "보완 요청은 제출된 항목만 가능합니다" : ""}
+              >
+                보완 요청
+              </button>
+              <button
                 className="btn btn-secondary"
                 onClick={() => navigate(`/receipt/receipts/${selectedReceipt.id}`)}
               >
@@ -485,7 +489,7 @@ const AdminFinancePage = () => {
         </div>
       )}
 
-      {/* 액션 모달 (승인/반려) */}
+      {/* 액션 모달 (승인/반려/보완요청) */}
       {showActionModal && (
         <div 
           className="fixed top-0 left-0 z-[1055] flex h-full w-full justify-center bg-black bg-opacity-20"
@@ -498,6 +502,7 @@ const AdminFinancePage = () => {
             <div className="justify-center mt-6 mb-6 text-2xl border-b-4 border-gray-500">
               {actionType === "APPROVE" && "승인 처리"}
               {actionType === "REJECT" && "반려 처리"}
+              {actionType === "REQUEST_MORE_INFO" && "보완 요청"}
             </div>
 
             <div className="pt-4 pb-4">
@@ -505,6 +510,7 @@ const AdminFinancePage = () => {
                 <label className="block text-sm font-medium mb-2">
                   {actionType === "APPROVE" && "승인 사유 (선택)"}
                   {actionType === "REJECT" && "반려 사유 (필수)"}
+                  {actionType === "REQUEST_MORE_INFO" && "보완 요청 사유 (필수)"}
                 </label>
                 <textarea
                   className="w-full p-2 border border-gray-300 rounded"
@@ -514,12 +520,14 @@ const AdminFinancePage = () => {
                   placeholder={
                     actionType === "APPROVE" 
                       ? "승인 사유를 입력하세요 (선택사항)"
-                      : "반려 사유를 입력하세요 (필수)"
+                      : actionType === "REJECT"
+                      ? "반려 사유를 입력하세요 (필수)"
+                      : "보완 요청 사유를 입력하세요 (필수)"
                   }
                 />
               </div>
 
-              {actionType === "REJECT" && !actionReason.trim() && (
+              {(actionType === "REJECT" || actionType === "REQUEST_MORE_INFO") && !actionReason.trim() && (
                 <div className="mb-4 p-2 bg-yellow-100 text-yellow-800 rounded text-sm">
                   ⚠️ 사유를 입력해주세요.
                 </div>

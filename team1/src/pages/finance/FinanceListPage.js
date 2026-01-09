@@ -134,8 +134,9 @@ const FinanceListPage = () => {
                                 <option value="">전체</option>
                                 <option value="DRAFT">임시저장</option>
                                 <option value="SUBMITTED">상신</option>
-                                <option value="APPROVED">승인</option>
+                                <option value="APPROVED">결재완료</option>
                                 <option value="REJECTED">반려</option>
+                                <option value="REQUEST_MORE_INFO">보완요청</option>
                             </select>
                         </div>
                         <div className="filter-item">

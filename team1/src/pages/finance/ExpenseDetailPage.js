@@ -1,19 +1,19 @@
-import React, { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { fetchExpense, submitExpense, deleteExpense } from "../../slices/expenseSlice";
-import { getApprovalLogs } from "../../api/approvalApi";
+import React, {useEffect, useState} from "react";
+import {useDispatch, useSelector} from "react-redux";
+import {useParams, useNavigate, useSearchParams} from "react-router-dom";
+import {fetchExpense, submitExpense, deleteExpense} from "../../slices/expenseSlice";
+import {getApprovalLogs} from "../../api/approvalApi";
 import ReceiptUpload from "../../components/finance/ReceiptUpload";
+import axiosInstance from "../../api/axiosInstance";
 import "./ExpenseDetailPage.css";
 import AppLayout from "../../components/layout/AppLayout";
-import jwtAxios from "../../util/jwtUtil";
 
 const ExpenseDetailPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const { id } = useParams();
+    const {id} = useParams();
     const [searchParams] = useSearchParams();
-    const { currentExpense, loading } = useSelector((state) => state.expense);
+    const {currentExpense, loading} = useSelector((state) => state.expense);
     const [approvalLogs, setApprovalLogs] = useState([]);
 
     useEffect(() => {
@@ -37,8 +37,8 @@ const ExpenseDetailPage = () => {
 
         try {
             // Expense ID로 ApprovalRequest 찾기 (list API에서 필터링)
-            const res = await jwtAxios.get(`/approval-requests/list`, {
-                params: { requestType: "EXPENSE", size: 100 }
+            const res = await axiosInstance.get(`/approval-requests/list`, {
+                params: {requestType: "EXPENSE", size: 100}
             });
 
             if (res.data && res.data.dtoList) {
@@ -62,7 +62,7 @@ const ExpenseDetailPage = () => {
 
     const handleSubmit = () => {
         if (id) {
-            dispatch(submitExpense({ id: parseInt(id) }));
+            dispatch(submitExpense({id: parseInt(id)}));
             // URL 쿼리 파라미터를 유지하여 목록 페이지로 이동 (mall 패턴)
             const queryString = searchParams.toString();
             navigate(`/receipt/expenses${queryString ? `?${queryString}` : ""}`);
@@ -84,6 +84,13 @@ const ExpenseDetailPage = () => {
         }
     };
 
+    // 보완 요청 사유 찾기
+    const getRequestMoreInfoReason = () => {
+        const requestMoreInfoLog = approvalLogs.find(
+            (log) => log.action === "REQUEST_MORE_INFO"
+        );
+        return requestMoreInfoLog?.message || null;
+    };
 
     if (loading) {
         return (
@@ -107,8 +114,9 @@ const ExpenseDetailPage = () => {
         const statusMap = {
             DRAFT: "임시저장",
             SUBMITTED: "상신",
-            APPROVED: "승인",
+            APPROVED: "결재완료",
             REJECTED: "반려",
+            REQUEST_MORE_INFO: "보완요청",
         };
         return statusMap[status || ""] || status;
     };
@@ -133,7 +141,7 @@ const ExpenseDetailPage = () => {
                     {currentExpense.status === "DRAFT" && (
                         <>
                             <button className="btn btn-outline"
-                                onClick={() => navigate(`/receipt/expenses/${id}/edit`)}>
+                                    onClick={() => navigate(`/receipt/expenses/${id}/edit`)}>
                                 수정
                             </button>
                             <button className="btn btn-danger" onClick={handleDelete}>
@@ -159,8 +167,8 @@ const ExpenseDetailPage = () => {
                             <label>전자결재 상태</label>
                             <span
                                 className={`status-badge status-${currentExpense.status?.toLowerCase().replace("_", "-") || ""}`}>
-                                {getStatusLabel(currentExpense.status)}
-                            </span>
+              {getStatusLabel(currentExpense.status)}
+            </span>
                         </div>
                         <div className="detail-item">
                             <label>지출 일자</label>
@@ -173,8 +181,8 @@ const ExpenseDetailPage = () => {
                         <div className="detail-item">
                             <label>이용금액</label>
                             <span className="amount-value">
-                                {currentExpense.amount ? currentExpense.amount.toLocaleString() + "원" : "-"}
-                            </span>
+              {currentExpense.amount ? currentExpense.amount.toLocaleString() + "원" : "-"}
+            </span>
                         </div>
                         <div className="detail-item">
                             <label>사용용도</label>
@@ -191,10 +199,10 @@ const ExpenseDetailPage = () => {
                         <div className="detail-item">
                             <label>전자결재 승인일</label>
                             <span>
-                                {currentExpense.status === "APPROVED" && currentExpense.updatedAt
-                                    ? currentExpense.updatedAt.split("T")[0]
-                                    : "-"}
-                            </span>
+              {currentExpense.status === "APPROVED" && currentExpense.updatedAt
+                  ? currentExpense.updatedAt.split("T")[0]
+                  : "-"}
+            </span>
                         </div>
                         {currentExpense.description && (
                             <div className="detail-item full-width">
@@ -204,6 +212,59 @@ const ExpenseDetailPage = () => {
                         )}
                     </div>
                 </div>
+
+                {/* 보완 요청 사유 표시 */}
+                {currentExpense.status === "REQUEST_MORE_INFO" && getRequestMoreInfoReason() && (
+                    <div className="card request-more-info-card">
+                        <h2 className="card-title">📋 보완 요청 사유</h2>
+                        <div className="request-reason">
+                            <p>{getRequestMoreInfoReason()}</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* 보완 요청 상태일 때 추가 자료 첨부 (비활성화) */}
+                {currentExpense.status === "REQUEST_MORE_INFO" && (
+                    <div className="card">
+                        <h2 className="card-title">📎 추가 자료 첨부</h2>
+                        <div className="supplement-upload-section">
+                            <div className="form-group">
+                                <label className="form-label">보완 자료 설명 (선택사항)</label>
+                                <textarea
+                                    className="form-textarea"
+                                    disabled={true}
+                                    placeholder="추가 자료에 대한 설명을 입력하세요 (준비 중)"
+                                    rows={3}
+                                    style={{opacity: 0.6, cursor: "not-allowed"}}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">파일 선택</label>
+                                <input
+                                    type="file"
+                                    multiple
+                                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                                    disabled={true}
+                                    className="file-input"
+                                    style={{opacity: 0.6, cursor: "not-allowed"}}
+                                />
+                                <div className="form-hint" style={{color: "#9ca3af"}}>
+                                    추가 자료 첨부 기능은 준비 중입니다
+                                </div>
+                            </div>
+                            <div className="supplement-actions">
+                                <button
+                                    className="btn btn-primary"
+                                    disabled={true}
+                                    style={{opacity: 0.6, cursor: "not-allowed"}}
+                                    title="재제출 기능은 준비 중입니다"
+                                >
+                                    재제출
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {currentExpense.status === "DRAFT" && (
                     <div className="card">

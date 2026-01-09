@@ -31,21 +31,12 @@ public class JWTCheckFilter extends OncePerRequestFilter {
         // ✅ 로그인/회원가입 등은 JWT 체크 제외
         if (path.startsWith("/api/auth/")) return true;
 
-        // ✅ 이미지 조회는 JWT 체크 제외 (공개 API)
-        if (path.startsWith("/api/view/")) return true;
-
         return false; // 그 외 /api/**는 필터 적용
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-
-        log.info("[JWTCHK] {} {} auth={}",
-                request.getMethod(),
-                request.getRequestURI(),
-                request.getHeader("Authorization"));
-
 
 
         // ✅ 1) Preflight는 무조건 패스

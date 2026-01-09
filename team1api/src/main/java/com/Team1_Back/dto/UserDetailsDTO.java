@@ -26,8 +26,4 @@ public class UserDetailsDTO {
     private boolean isActive;
     private LocalDateTime createdUserAt;
     private LocalDateTime updatedUserAt;
-    
-    // 프로필 이미지 URL 추가
-    private String profileImageUrl;
-    private String thumbnailUrl;
 }

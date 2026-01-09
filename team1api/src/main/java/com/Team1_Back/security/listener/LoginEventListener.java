@@ -8,7 +8,6 @@ import com.Team1_Back.domain.LoginAttempt;
 import com.Team1_Back.domain.User;
 import com.Team1_Back.repository.LoginAttemptRepository;
 import com.Team1_Back.repository.UserRepository;
-import com.Team1_Back.service.MypageService; // ✅ 추가
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +16,6 @@ import lombok.extern.slf4j.Slf4j;
  * 로그인 이벤트 리스너
  *
  * Handler에서 발행한 이벤트를 받아서 DB 작업을 처리합니다.
- * 
  * @Component로 등록되어 Repository 주입이 가능합니다.
  */
 @Component
@@ -27,7 +25,6 @@ public class LoginEventListener {
 
     private final UserRepository userRepository;
     private final LoginAttemptRepository loginAttemptRepository;
-    private final MypageService mypageService; // ✅ 추가
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
 
@@ -35,9 +32,7 @@ public class LoginEventListener {
      * 로그인 성공 이벤트 처리
      */
     @EventListener
-    // @Transactional
-    // Transaction silently rolled back because it has been marked as rollback-only
-    // 문제 발생
+    @Transactional
     public void handleLoginSuccess(LoginSuccessEvent event) {
 
         log.info("로그인 성공 이벤트 처리 - 사번: {}", event.getEmployeeNo());
@@ -49,26 +44,13 @@ public class LoginEventListener {
             // 실패 횟수 초기화
             user.resetFailedLoginCount();
             userRepository.save(user);
-
-            // ✅ 자동 출석체크 추가 (별도 트랜잭션으로 실행)
-            try {
-                // 별도 트랜잭션으로 실행하여 메인 트랜잭션에 영향 없도록
-                mypageService.checkIn(user.getId());
-                log.info("자동 출석체크 완료 - 사번: {}", event.getEmployeeNo());
-            } catch (RuntimeException e) {
-                // 이미 출석 처리된 경우나 기타 오류는 무시 (로그인은 성공)
-                log.warn("자동 출석체크 실패 (무시) - 사번: {}, 오류: {}", event.getEmployeeNo(), e.getMessage());
-            } catch (Exception e) {
-                // 예상치 못한 오류도 무시 (로그인은 성공)
-                log.error("자동 출석체크 중 예외 발생 (무시) - 사번: {}", event.getEmployeeNo(), e);
-            }
         }
 
         // 로그인 성공 기록 저장
         saveLoginAttempt(event.getEmployeeNo(), event.getIpAddress(), true);
     }
 
-    // 로그인 실패 로직
+ // 로그인 실패 로직
     @EventListener
     @Transactional
     public void handleLoginFailure(LoginFailEvent event) {
