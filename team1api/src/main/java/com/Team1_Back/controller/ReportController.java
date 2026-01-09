@@ -52,6 +52,8 @@ public class ReportController {
 
         ReportPrincipal rp = toReportPrincipal(principal);
         var r = reportService.generate(rp, req);
+        String dept = req.getFilters().getDepartment();
+
         return ResponseEntity.ok(
                 new ReportGenerateResponseDTO(r.reportId(), r.status(), r.fileName())
         );

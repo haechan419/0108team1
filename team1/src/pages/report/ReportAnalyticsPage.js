@@ -1,4 +1,7 @@
+
 import { useEffect, useMemo, useState } from "react";
+import { useSelector } from "react-redux";
+
 import AppLayout from "../../components/layout/AppLayout";
 import "../../styles/report.css";
 import { REPORT_TYPES } from "../../constants/reportTypes";
@@ -8,9 +11,43 @@ export default function ReportAnalyticsPage() {
     // ✅ 링크(a href)용: 파일 다운로드를 새 탭으로 열 때만 사용
     // axiosInstance는 baseURL이 /api까지 포함이므로, 앵커는 origin을 별도로 둠
     const API_ORIGIN = "http://localhost:8080";
+    const loginState = useSelector((state) => state.loginSlice);
+
+    const role = useMemo(() => {
+        const roles = loginState?.roleNames ?? loginState?.roles ?? [];
+        const single = loginState?.role ?? loginState?.roleName;
+
+        const upperRoles = (Array.isArray(roles) ? roles : [])
+            .map((r) => String(r).toUpperCase());
+        const upperSingle = single ? String(single).toUpperCase() : "";
+
+        if (upperRoles.includes("ADMIN") || upperSingle === "ADMIN") return "ADMIN";
+        if (upperRoles.includes("EMPLOYEE") || upperSingle === "EMPLOYEE") return "EMPLOYEE";
+
+        // ✅ 혹시 서버가 USER로 주면 EMPLOYEE로 치환(프로젝트 정책상 USER=EMPLOYEE라면)
+        if (upperRoles.includes("USER") || upperSingle === "USER") return "EMPLOYEE";
+
+        return "EMPLOYEE"; // 기본값
+    }, [loginState]);
+
+    // "누가 요청했는지"는 프론트에서 박지 말고 보통 서버가 JWT/세션에서 뽑는 게 정석
+    const requester = useMemo(() => {
+        return loginState?.employeeNo ?? loginState?.id ?? null;
+    }, [loginState]);
+
+    // ADMIN: /admin/report-schedules
+// USER : /report-schedules
+    const SCHEDULE_BASE = role === "ADMIN" ? "/admin/report-schedules" : "/report-schedules";
+    const [departments, setDepartments] = useState([]);
+    const [dept, setDept] = useState(""); // 선택된 부서명
+
+
+    const [approvedTotal, setApprovedTotal] = useState(null);
+    const [approvedCount, setApprovedCount] = useState(null);
+
 
     // ✅ 실제로는 로그인 훅/스토어에서 role 받아오면 됨
-    const [role] = useState("ADMIN");
+    // const [role] = useState("ADMIN");
 
     const SCOPE_MAP = { "My Data": "MY", Department: "DEPT", All: "ALL" };
     const FORMAT_MAP = { PDF: "PDF", Excel: "EXCEL", EXCEL: "EXCEL" };
@@ -59,10 +96,11 @@ export default function ReportAnalyticsPage() {
     const [schedules, setSchedules] = useState([]);
     const [isSchedulesLoading, setIsSchedulesLoading] = useState(false);
 
+
     const fetchSchedules = async () => {
         try {
             setIsSchedulesLoading(true);
-            const res = await axiosInstance.get("/admin/report-schedules");
+            const res = await axiosInstance.get(SCHEDULE_BASE);
             const data = res.data;
             setSchedules(data?.items ?? (Array.isArray(data) ? data : []));
         } catch (e) {
@@ -74,20 +112,20 @@ export default function ReportAnalyticsPage() {
     };
 
     const createSchedule = async (payload) => {
-        const res = await axiosInstance.post("/admin/report-schedules", payload);
+        const res = await axiosInstance.post(SCHEDULE_BASE, payload);
         return res.data;
     };
 
     const updateSchedule = async (id, payload) => {
-        const res = await axiosInstance.put(`/admin/report-schedules/${id}`, payload);
+        const res = await axiosInstance.put(`${SCHEDULE_BASE}/${id}`, payload);
         return res.data;
     };
 
     const runScheduleNow = async (id) => {
-        // 기존: POST /api/admin/report-schedules/{id}/run
-        const res = await axiosInstance.post(`/admin/report-schedules/${id}/run`);
+        const res = await axiosInstance.post(`${SCHEDULE_BASE}/${id}/run`);
         return res.data;
     };
+
 
     // -------------------------
     // RBAC options
@@ -102,20 +140,25 @@ export default function ReportAnalyticsPage() {
         [role]
     );
 
+    useEffect(() => {
+        if (role === "EMPLOYEE") setSelected((p) => ({ ...p, scope: ["My Data"] }));
+    }, [role]);
+
+
     // -------------------------
     // Filter defs (CSS 구조 고정)
     // -------------------------
     const FILTERS = useMemo(
         () => [
-            { key: "period", label: "Period", type: "single", options: PERIOD_OPTIONS },
-            { key: "scope", label: "Data Scope", type: "single", options: scopeOptions },
+            { key: "period", label: "기간", type: "single", options: PERIOD_OPTIONS },
+            { key: "scope", label: "범위", type: "single", options: scopeOptions },
             {
                 key: "category",
-                label: "Category",
+                label: "카데고리",
                 type: "multi",
                 options: ["All", "Meals", "Supplies", "Taxi", "Other"],
             },
-            { key: "format", label: "Format", type: "single", options: ["PDF", "EXCEL"] },
+            { key: "format", label: "형식", type: "single", options: ["PDF", "EXCEL"] },
         ],
         [scopeOptions]
     );
@@ -138,9 +181,30 @@ export default function ReportAnalyticsPage() {
     const [selected, setSelected] = useState(getDefaultSelected());
 
     useEffect(() => {
-        if (role === "ADMIN") fetchSchedules();
+        if (role === "ADMIN")   fetchSchedules();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [role]);
+
+    useEffect(() => {
+        const isDeptMode = role === "ADMIN" && selected.scope?.[0] === "Department";
+
+        if (!isDeptMode) {
+            setDept("");          // ✅ Department 모드 아니면 선택값 제거
+            return;
+        }
+
+        (async () => {
+            try {
+                const res = await axiosInstance.get("/admin/departments");
+                const list = Array.isArray(res.data) ? res.data : (res.data?.items ?? []);
+                setDepartments(list);
+            } catch (e) {
+                console.error(e);
+                setDepartments([]);
+            }
+        })();
+    }, [role, selected.scope]);
+
 
     useEffect(() => {
         if (role !== "ADMIN") setSelected((p) => ({ ...p, scope: ["My Data"] }));
@@ -195,6 +259,14 @@ export default function ReportAnalyticsPage() {
             alert(String(e?.response?.data?.message ?? e?.message ?? e));
         }
     };
+
+    const currentType = useMemo(
+        () => REPORT_TYPES.find((t) => t.id === reportTypeId),
+        [reportTypeId]
+    );
+
+    const effectiveFormat = currentType?.outputFormat ?? "PDF"; // fallback
+
 
     const handleRunNow = async (id) => {
         try {
@@ -311,19 +383,32 @@ export default function ReportAnalyticsPage() {
         try {
             setIsGenerating(true);
 
+            setApprovedTotal(null);
+            setApprovedCount(null);
+
             const uiScope = selected.scope?.[0] ?? (role === "ADMIN" ? "Department" : "My Data");
-            const uiFormat = selected.format?.[0] ?? "PDF";
-            const format = uiFormat.trim().toUpperCase() === "EXCEL" ? "EXCEL" : "PDF";
+            const dataScope = SCOPE_MAP[uiScope] ?? (role === "ADMIN" ? "DEPT" : "MY");
+
+            // ✅ ADMIN + DEPT면 부서 선택 강제
+            if (role === "ADMIN" && dataScope === "DEPT" && !dept) {
+                return alert("부서를 선택하세요.");
+            }
 
             const payload = {
                 reportTypeId,
                 filters: {
                     period: selected.period?.[0] ?? null,
-                    dataScope: SCOPE_MAP[uiScope] ?? (role === "ADMIN" ? "DEPT" : "MY"),
+                    dataScope,
+
                     category: selected.category?.length ? selected.category : ["ALL"],
-                    format,
+                    format: effectiveFormat,
+
+                    // ✅ 여기 박는거임
+                    department: role === "ADMIN" && dataScope === "DEPT" ? dept : null,
                 },
             };
+
+            console.log("[GEN payload]", payload);
 
             const res = await axiosInstance.post("/reports/generate", payload);
             const data = res.data;
@@ -331,6 +416,10 @@ export default function ReportAnalyticsPage() {
             setGeneratedReportId(data.reportId);
             setIsGenerated(true);
             setLogsMode({ type: "REPORT", fileId: null });
+
+            // ✅ 추가: 백엔드가 내려준 승인 합계 표시용
+            setApprovedTotal(data.approvedTotal ?? null);
+            setApprovedCount(data.approvedCount ?? null);
         } catch (e) {
             console.error(e);
             alert("Generate failed");
@@ -478,11 +567,11 @@ export default function ReportAnalyticsPage() {
     return (
         <AppLayout>
             <div className="report-page">
-                <div className="page-title">Report &amp; Analytics</div>
+                <div className="page-title"> 업무보드 &amp; 분석</div>
 
                 {/* 1) Filter Panel */}
                 <section className="section">
-                    <div className="section-title">Filter Panel</div>
+                    <div className="section-title">필터 선택</div>
 
                     <div className="panel panel-filter2">
                         <div className="filter-tabs">
@@ -518,7 +607,7 @@ export default function ReportAnalyticsPage() {
                                 className="action-btn action-secondary"
                                 onClick={() => setSelected(getDefaultSelected())}
                             >
-                                Clear Filters
+                                초기화하기
                             </button>
                         </div>
 
@@ -583,9 +672,27 @@ export default function ReportAnalyticsPage() {
                     </div>
                 </section>
 
+                {role === "ADMIN" && selected.scope?.[0] === "Department" && (
+                    <div className="panel" style={{ marginTop: 10 }}>
+                        <div className="hint" style={{ marginBottom: 6 }}>Department</div>
+
+                        <select
+                            value={dept}
+                            onChange={(e) => setDept(e.target.value)}
+                            style={{ width: "100%" }}
+                        >
+                            <option value="">-- Select Department --</option>
+                            {departments.map((d) => (
+                                <option key={d} value={d}>{d}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+
                 {/* 2) Report Type Selection */}
                 <section className="section">
-                    <div className="section-title">Report Type Selection</div>
+                    <div className="section-title">리포트 타입 선택</div>
 
                     <div className="panel">
                         <div className="radio-list">
@@ -606,7 +713,7 @@ export default function ReportAnalyticsPage() {
 
                 {/* 3) Preview */}
                 <section className="section">
-                    <div className="section-title">Report Summary Preview</div>
+                    <div className="section-title">보고서 요약  Preview</div>
 
                     <div className="panel preview-box">
                         <div className="doc-viewer">
@@ -692,6 +799,7 @@ export default function ReportAnalyticsPage() {
                             disabled={isGenerating}
                         >
                             {isGenerating ? "Generating..." : "Generate Report"}
+
                         </button>
 
                         <button
@@ -730,35 +838,20 @@ export default function ReportAnalyticsPage() {
                                             </div>
                                         </div>
 
-                                        <button
-                                            type="button"
-                                            className="action-btn action-primary2"
-                                            onClick={() => handleDownloadFile(f.fileId ?? f.id, f.fileName)}
-                                        >
-                                            Download
-                                        </button>
 
-                                        {role === "ADMIN" && (
-                                            <button
-                                                type="button"
-                                                className="action-btn action-secondary"
-                                                onClick={() => fetchLogsByFile(f.fileId ?? f.id)}
-                                                style={{ marginLeft: 8 }}
-                                            >
-                                                Logs
-                                            </button>
-                                        )}
+
                                     </li>
                                 ))}
                             </ul>
                         )}
                     </div>
+
                 )}
 
                 {/* 5) Automation / Schedules (ADMIN only) */}
                 {role === "ADMIN" && (
                     <section className="section">
-                        <div className="section-title">Automation / Schedules</div>
+                        <div className="section-title"> 자동화 및 스케줄러</div>
 
                         <ScheduleModal
                             open={isScheduleModalOpen}
@@ -771,7 +864,7 @@ export default function ReportAnalyticsPage() {
                         <div className="panel">
                             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginBottom: 10 }}>
                                 <button type="button" className="action-btn action-secondary" onClick={openCreateScheduleModal}>
-                                    + Create Schedule
+                                    + 스케줄러 추가하기
                                 </button>
 
                                 <button
@@ -1013,7 +1106,7 @@ function ScheduleModal({ open, onClose, onSubmit, initial, reportTypes }) {
                 time: `${pad2(Number(time.split(":")[0]))}:${pad2(Number(time.split(":")[1]))}`,
                 daysOfWeek: repeatType === "WEEKLY" ? daysOfWeek : null,
                 dayOfMonth: repeatType === "MONTHLY" ? Number(dayOfMonth) : null,
-                requestedBy: "ADMIN",
+                //  requestedBy: "ADMIN",
             };
             onSubmit(payload);
             return;

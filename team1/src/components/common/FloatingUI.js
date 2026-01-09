@@ -2,6 +2,7 @@ import React from "react";
 import { useCart } from "../../context/CartContext";
 import "../../styles/floating.css"; // 스타일 파일 (3단계에서 만듦)
 
+
 export default function FloatingUI() {
   const { toastMessage, toggleDrawer, cartItems } = useCart();
 

@@ -184,9 +184,8 @@ export default function ShopPage() {
               ].map((cat) => (
                 <button
                   key={cat}
-                  className={`filter-btn ${
-                    currentCategory === cat ? "active" : ""
-                  }`}
+                  className={`filter-btn ${currentCategory === cat ? "active" : ""
+                    }`}
                   onClick={() => setCurrentCategory(cat)}
                   style={
                     cat === "Favorites"
@@ -231,7 +230,7 @@ export default function ShopPage() {
                     const isFav = favorites.includes(product.pno);
                     const imageUrl =
                       product.uploadFileNames &&
-                      product.uploadFileNames.length > 0
+                        product.uploadFileNames.length > 0
                         ? `${API_SERVER_HOST}/api/products/view/s_${product.uploadFileNames[0]}`
                         : "https://via.placeholder.com/150";
 

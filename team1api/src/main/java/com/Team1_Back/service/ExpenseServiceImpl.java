@@ -34,7 +34,8 @@ public class ExpenseServiceImpl implements ExpenseService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponseDTO<ExpenseDTO> getList(Long userId, PageRequestDTO pageRequestDTO, String status, LocalDate startDate, LocalDate endDate) {
+    public PageResponseDTO<ExpenseDTO> getList(Long userId, PageRequestDTO pageRequestDTO, String status,
+            LocalDate startDate, LocalDate endDate) {
         if (pageRequestDTO == null) {
             pageRequestDTO = PageRequestDTO.builder().page(1).size(15).build();
         }
@@ -54,7 +55,8 @@ public class ExpenseServiceImpl implements ExpenseService {
 
         Page<Expense> result;
         if (statusEnum != null && startDate != null && endDate != null) {
-            result = expenseRepository.findByUserIdAndStatusAndDateRange(userId, statusEnum, startDate, endDate, pageable);
+            result = expenseRepository.findByUserIdAndStatusAndDateRange(userId, statusEnum, startDate, endDate,
+                    pageable);
         } else if (statusEnum != null) {
             result = expenseRepository.findByWriterIdAndStatus(userId, statusEnum, pageable);
         } else if (startDate != null && endDate != null) {
@@ -70,11 +72,10 @@ public class ExpenseServiceImpl implements ExpenseService {
                 .filter(dto -> dto != null)
                 .collect(Collectors.toList());
 
-        return PageResponseDTO.<ExpenseDTO>withAll()
-                .dtoList(dtoList)
-                .totalCount(result.getTotalElements())
-                .pageRequestDTO(pageRequestDTO)
-                .build();
+        return PageResponseDTO.<ExpenseDTO>of(
+                dtoList,
+                pageRequestDTO,
+                result.getTotalElements());
     }
 
     @Override
@@ -158,10 +159,10 @@ public class ExpenseServiceImpl implements ExpenseService {
         ApprovalRequest savedRequest = approvalRequestRepository.save(approvalRequest);
 
         // ApprovalActionLog 생성 (SUBMIT 액션)
-        String message = (submitDTO != null && submitDTO.getRequestNote() != null) 
-            ? submitDTO.getRequestNote() 
-            : "지출 내역을 제출했습니다.";
-        
+        String message = (submitDTO != null && submitDTO.getRequestNote() != null)
+                ? submitDTO.getRequestNote()
+                : "지출 내역을 제출했습니다.";
+
         ApprovalActionLog actionLog = ApprovalActionLog.builder()
                 .approvalRequest(savedRequest)
                 .actor(expense.getWriter())
@@ -173,7 +174,8 @@ public class ExpenseServiceImpl implements ExpenseService {
     }
 
     private Expense dtoToEntity(ExpenseDTO dto) {
-        if (dto == null) return null;
+        if (dto == null)
+            return null;
 
         return Expense.builder()
                 .id(dto.getId())
@@ -188,10 +190,11 @@ public class ExpenseServiceImpl implements ExpenseService {
     }
 
     private ExpenseDTO entityToDTO(Expense entity) {
-        if (entity == null) return null;
-        
+        if (entity == null)
+            return null;
+
         User writer = entity.getWriter();
-        
+
         // 1. Builder를 사용하여 수동으로 매핑 (ModelMapper 제거)
         ExpenseDTO dto = ExpenseDTO.builder()
                 .id(entity.getId())
@@ -207,7 +210,7 @@ public class ExpenseServiceImpl implements ExpenseService {
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
-        
+
         // 2. Repository 조회가 필요한 추가 데이터 처리
         Optional<ReceiptUpload> receiptOpt = receiptUploadRepository.findByExpenseId(entity.getId());
         if (receiptOpt.isPresent()) {
@@ -236,4 +239,3 @@ public class ExpenseServiceImpl implements ExpenseService {
                 .collect(Collectors.toMap(ExpenseDTO::getId, java.util.function.Function.identity()));
     }
 }
-

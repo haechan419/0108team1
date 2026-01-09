@@ -41,5 +41,4 @@ public class NotificationController {
         notificationService.read(nno);
         return Map.of("result", "SUCCESS");
     }
-    
 }

@@ -16,7 +16,9 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -40,6 +42,12 @@ public class SecurityConfig {
     private final ApplicationEventPublisher eventPublisher;
 
     @Bean
+    public WebSecurityCustomizer webSecurityCustomizer() {
+        return (WebSecurity web) -> web.ignoring()
+                .requestMatchers("/ws-chat/**");
+    }
+
+    @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
@@ -49,15 +57,15 @@ public class SecurityConfig {
         return new JWTCheckFilter();
     }
 
-
     @Bean
     @Order(HIGHEST_PRECEDENCE)
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOrigins(List.of("http://localhost:3000"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of(
+        //  1) 기존 정책 (API용) - 너가 원한대로 그대로 유지
+        CorsConfiguration apiConfig = new CorsConfiguration();
+        apiConfig.setAllowedOrigins(List.of("http://localhost:3000"));
+        apiConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        apiConfig.setAllowedHeaders(List.of(
                 "Content-Type",
                 "Authorization",
                 "Cache-Control",
@@ -65,46 +73,49 @@ public class SecurityConfig {
                 "X-Role",
                 "X-Dept"
         ));
-        config.setExposedHeaders(List.of("Content-Disposition"));
+        apiConfig.setExposedHeaders(List.of("Content-Disposition"));
+        apiConfig.setAllowCredentials(false); // ✅ 그대로 유지
 
-        config.setAllowCredentials(false);
+        //  2) SockJS(WebSocket) 전용 정책 - 여기만 credentials 허용
+        CorsConfiguration wsConfig = new CorsConfiguration();
+        wsConfig.setAllowedOrigins(List.of("http://localhost:3000"));
+        wsConfig.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
+
+        // SockJS가 /info 등에서 여러 헤더를 쓸 수 있어서
+        // 최소한 Authorization은 포함, 나머지는 필요하면 추가
+        wsConfig.setAllowedHeaders(List.of("Content-Type", "Authorization"));
+        wsConfig.setAllowCredentials(true); // ✅ 여기만 true
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
+
+        //  더 구체적인 /ws-chat/** 를 먼저 등록 (우선 적용)
+        source.registerCorsConfiguration("/ws-chat/**", wsConfig);
+
+        //  나머지는 기존 정책 적용
+        source.registerCorsConfiguration("/**", apiConfig);
+
         return source;
     }
-
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-
-        log.info("--------------------- security config (JWT + API no-redirect) ---------------------");
 
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-                // ✅ JWT 기반이면 stateless
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                .addFilterBefore(new JWTCheckFilter(), UsernamePasswordAuthenticationFilter.class)
+                // ✅ 여기 딱 1번만
+                .addFilterBefore(jwtCheckFilter(), UsernamePasswordAuthenticationFilter.class)
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll()
+                        .requestMatchers("/ws-chat/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
-
-                        // Face ID 로그인
-                        .requestMatchers("/api/face/**").permitAll()
-
-                        // ✅ 관리자 전용
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-
-                        // ✅ 로그인 필요
                         .requestMatchers("/api/reports/**").authenticated()
-
                         .anyRequest().permitAll()
                 )
 
-                // ✅ API는 리다이렉트 금지: 무조건 401 JSON
                 .exceptionHandling(e -> e
                         .defaultAuthenticationEntryPointFor(
                                 (request, response, authException) -> {
@@ -116,7 +127,6 @@ public class SecurityConfig {
                         )
                 )
 
-                // ✅ 로그인은 처리 URL만 사용 (페이지 렌더링 X)
                 .formLogin(form -> form
                         .loginProcessingUrl("/api/auth/login")
                         .usernameParameter("employeeNo")
@@ -133,12 +143,9 @@ public class SecurityConfig {
                             response.getWriter().write("{\"success\":true,\"message\":\"로그아웃 성공\"}");
                         })
                 )
-
                 .httpBasic(basic -> basic.disable());
-
-        // ✅ JWT 필터 등록
-        http.addFilterBefore(jwtCheckFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
+
 }

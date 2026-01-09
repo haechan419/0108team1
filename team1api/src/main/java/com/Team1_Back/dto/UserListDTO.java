@@ -20,4 +20,7 @@ public class UserListDTO {
     private LocalDateTime createdUserAt;
     private boolean locked;
     private boolean active;
+    
+    // 프로필 이미지 썸네일 URL 추가
+    private String thumbnailUrl;
 }

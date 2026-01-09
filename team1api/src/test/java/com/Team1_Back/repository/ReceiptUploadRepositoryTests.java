@@ -70,6 +70,7 @@ public class ReceiptUploadRepositoryTests {
      * ReceiptUploadRepositoryTests.insertDummyReceiptUploads() 실행 후 사용
      */
     @Test
+    @Transactional
     public void insertDummyReceiptAiExtractions() {
         List<ReceiptUpload> receiptUploads = receiptUploadRepository.findAll().stream()
                 .limit(8)

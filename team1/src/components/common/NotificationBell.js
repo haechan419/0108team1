@@ -4,7 +4,6 @@ import { useSelector, useDispatch } from "react-redux";
 import {
   checkMyNotification,
   removeNotification,
-  markAllRead, // ✨ [추가] 모두 읽음 액션 임포트
 } from "../../slices/notificationSlice";
 
 const NotificationBell = () => {
@@ -14,7 +13,6 @@ const NotificationBell = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { items: notifications } = useSelector((state) => state.notification);
 
-  // 5초마다 알림 체크
   useEffect(() => {
     dispatch(checkMyNotification());
     const interval = setInterval(() => {
@@ -23,7 +21,6 @@ const NotificationBell = () => {
     return () => clearInterval(interval);
   }, [dispatch]);
 
-  // 개별 알림 클릭 핸들러
   const handleItemClick = (item) => {
     dispatch(removeNotification(item.id));
     setIsOpen(false);
@@ -35,30 +32,23 @@ const NotificationBell = () => {
     }
   };
 
-  // ✨ [추가] 모두 읽음 버튼 핸들러
-  const handleMarkAllRead = (e) => {
-    e.stopPropagation(); // 드롭다운 닫힘 방지
-    if (window.confirm("모든 알림을 읽음(삭제) 처리 하시겠습니까?")) {
-      dispatch(markAllRead());
-    }
-  };
-
   // 🎨 글자 색상 결정 함수
   const getTitleColor = (note) => {
     const title = note.title || "";
+    // 보완, 반려, 보류 등은 빨간색/주황색 계열로 강조!
     if (
       title.includes("보완") ||
       title.includes("반려") ||
       title.includes("보류")
     ) {
-      return "#e67e22"; // 주황색 (강조)
+      return "#e67e22"; // 주황색 (눈에 확 띔)
     }
+    // 기존 색상 유지
     return note.notiType === "ORDER" ? "#2980b9" : "#27ae60";
   };
 
   return (
     <div style={{ position: "relative" }}>
-      {/* 🔔 종 아이콘 */}
       <div
         onClick={() => setIsOpen(!isOpen)}
         style={{ position: "relative", cursor: "pointer", padding: "8px" }}
@@ -82,28 +72,11 @@ const NotificationBell = () => {
         )}
       </div>
 
-      {/* 📜 드롭다운 메뉴 */}
       {isOpen && (
         <>
           <div style={overlayStyle} onClick={() => setIsOpen(false)} />
           <div style={dropdownStyle}>
-            {/* ✨ [수정] 헤더에 '모두 읽음' 버튼 추가 */}
-            <div style={headerStyle}>
-              <span>알림 센터</span>
-              {notifications.length > 0 && (
-                <button
-                  onClick={handleMarkAllRead}
-                  style={clearButtonStyle}
-                  onMouseOver={(e) =>
-                    (e.target.style.textDecoration = "underline")
-                  }
-                  onMouseOut={(e) => (e.target.style.textDecoration = "none")}
-                >
-                  모두 읽음
-                </button>
-              )}
-            </div>
-
+            <div style={headerStyle}>알림 센터</div>
             <ul style={listStyle}>
               {notifications.length === 0 ? (
                 <li style={emptyItemStyle}>새로운 알림이 없습니다.</li>
@@ -114,6 +87,7 @@ const NotificationBell = () => {
                     style={itemStyle}
                     onClick={() => handleItemClick(note)}
                   >
+                    {/* ✨ 색상 로직 적용됨 */}
                     <div
                       style={{
                         fontWeight: "bold",
@@ -147,8 +121,7 @@ const NotificationBell = () => {
   );
 };
 
-// --- 스타일 정의 ---
-
+// 스타일 (기존 유지)
 const badgeStyle = {
   position: "absolute",
   top: 0,
@@ -161,7 +134,6 @@ const badgeStyle = {
   padding: "2px 5px",
   border: "2px solid white",
 };
-
 const overlayStyle = {
   position: "fixed",
   top: 0,
@@ -170,7 +142,6 @@ const overlayStyle = {
   height: "100%",
   zIndex: 998,
 };
-
 const dropdownStyle = {
   position: "absolute",
   top: "45px",
@@ -183,28 +154,12 @@ const dropdownStyle = {
   zIndex: 999,
   overflow: "hidden",
 };
-
-// ✨ [수정] Flexbox 적용하여 양끝 정렬
 const headerStyle = {
   padding: "12px",
   borderBottom: "1px solid #f0f0f0",
   fontWeight: "bold",
   backgroundColor: "#f9fafb",
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
 };
-
-// ✨ [추가] 모두 읽음 버튼 스타일
-const clearButtonStyle = {
-  fontSize: "11px",
-  color: "#3498db", // 파란색
-  background: "none",
-  border: "none",
-  cursor: "pointer",
-  padding: "0",
-};
-
 const listStyle = {
   listStyle: "none",
   padding: 0,
@@ -212,14 +167,12 @@ const listStyle = {
   maxHeight: "300px",
   overflowY: "auto",
 };
-
 const itemStyle = {
   padding: "12px",
   borderBottom: "1px solid #f0f0f0",
   cursor: "pointer",
   transition: "background 0.2s",
 };
-
 const emptyItemStyle = {
   padding: "20px",
   textAlign: "center",

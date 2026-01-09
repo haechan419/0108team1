@@ -277,7 +277,7 @@ const AdminShopPage = () => {
               <div style={imageContainerStyle}>
                 {/* 안전한 이미지 접근 (?. 사용) */}
                 {product.uploadFileNames &&
-                product.uploadFileNames.length > 0 ? (
+                  product.uploadFileNames.length > 0 ? (
                   <img
                     src={`${API_SERVER_HOST}/api/products/view/s_${product.uploadFileNames[0]}`}
                     alt={product.pname}

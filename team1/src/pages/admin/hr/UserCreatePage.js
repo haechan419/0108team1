@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createUser } from "../../../api/adminUserApi";
+import { createUser, uploadProfileImage } from "../../../api/adminUserApi";
 import AppLayout from "../../../components/layout/AppLayout";
+import ProfileImageUpload from "../../../components/admin/hr/ProfileImageUpload";
 import "./UserCreatePage.css";
 
 const UserCreatePage = () => {
@@ -23,6 +24,7 @@ const UserCreatePage = () => {
   });
 
   const [loading, setLoading] = useState(false);
+  const [profileImageFile, setProfileImageFile] = useState(null);
 
   // 부서 목록 (고정값 또는 API로 가져올 수 있음)
   const departments = [
@@ -66,7 +68,19 @@ const UserCreatePage = () => {
 
     setLoading(true);
     try {
+      // 1. 사원 등록
       const result = await createUser(formData);
+      
+      // 2. 프로필 이미지가 있으면 업로드
+      if (profileImageFile) {
+        try {
+          await uploadProfileImage(result.id, profileImageFile);
+        } catch (imgError) {
+          console.error("프로필 이미지 업로드 실패:", imgError);
+          // 이미지 업로드 실패해도 사원 등록은 성공
+        }
+      }
+      
       alert("사원이 등록되었습니다.");
       navigate(`/admin/hr/users/${result.id}`);
     } catch (error) {
@@ -79,6 +93,11 @@ const UserCreatePage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // 이미지 변경 핸들러
+  const handleImageChange = (file) => {
+    setProfileImageFile(file);
   };
 
   // 취소
@@ -95,13 +114,9 @@ const UserCreatePage = () => {
         <div className="top-section">
           {/* 왼쪽: 사진 업로드 영역 */}
           <div className="photo-section">
-            <h3 className="section-title">사진업로드(증명사진)</h3>
-            <div className="photo-placeholder">
-              <span>사진 없음</span>
-            </div>
-            <button type="button" className="btn btn-outline">
-              파일 업로드
-            </button>
+            <ProfileImageUpload 
+              onImageChange={handleImageChange}
+            />
           </div>
 
           {/* 오른쪽: 직원 정보 */}

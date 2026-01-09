@@ -1,107 +1,82 @@
-/* ===== Floating Button (왼쪽 아래) ===== */
-.ai-fab {
-   position: fixed;
-    left: 18px;
-    bottom: 18px;
-    width: 58px;
-    height: 58px;
-    border-radius: 999px;
-    border: 1px solid rgba(0, 0, 0, 0.12);
-    background: #f2f2f2;
-    color: #111;
-    font-weight: 800;
-    letter-spacing: 0.5px;
-    cursor: pointer;
-    box-shadow: 0 10px 22px rgba(0,0,0,0.12);
-    z-index: 9999;
-}
-
-
-@keyframes aiBob {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
-}
-
-/* ===== Overlay ===== */
-.ai-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.20);
-    z-index: 9998;
-}
+/* =========================
+   AI Slide Panel (FULL)
+   - Panel: fixed + flex column
+   - Scroll owners: files (optional), result box (main)
+   - Body itself: NO scroll (height owner only)
+========================= */
 
 /* ===== Slide Panel ===== */
 .ai-panel {
     position: fixed;
-    right: 16px;              /* 오른쪽에서 나오게 */
+    right: 16px;
     bottom: 16px;
+
     width: 380px;
     max-width: calc(100vw - 32px);
+
     height: 520px;
     max-height: calc(100vh - 32px);
+
     background: #fff;
     border-radius: 14px;
-    border: 1px solid rgba(0,0,0,0.10);
-    box-shadow: 0 18px 40px rgba(0,0,0,0.18);
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+
     overflow: hidden;
 
-    /* 슬라이드 등장 */
+    /* ✅ 핵심: column layout */
+    display: flex;
+    flex-direction: column;
+
     animation: aiSlideUp 180ms ease-out;
 }
 
-@keyframes aiSlideUp {
-    from { transform: translateY(10px); opacity: 0.6; }
-    to   { transform: translateY(0); opacity: 1; }
-}
-
-/* ===== Panel 내부 ===== */
+/* ===== Header (fixed) ===== */
 .ai-panel__header {
+    flex: 0 0 auto;
+
     display: flex;
     align-items: center;
     justify-content: space-between;
+
     padding: 12px 12px;
-    border-bottom: 1px solid rgba(0,0,0,0.08);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-.ai-panel__title {
-    font-weight: 800;
-    font-size: 14px;
-}
-
-.ai-x {
-    width: 34px;
-    height: 34px;
-    border-radius: 10px;
-    border: 1px solid rgba(0,0,0,0.10);
-    background: #fafafa;
-    cursor: pointer;
-}
-
+/* ===== Body (height owner, NO scroll) ===== */
 .ai-panel__body {
+    flex: 1 1 auto;
+    min-height: 0; /* 🔥 내부 flex/overflow 정상화 핵심 */
+
     padding: 12px;
-    display: grid;
+
+    display: flex;
+    flex-direction: column;
     gap: 10px;
 }
 
+/* ===== Inputs ===== */
 .ai-input {
     width: 100%;
     border-radius: 12px;
-    border: 1px solid rgba(0,0,0,0.12);
+    border: 1px solid rgba(0, 0, 0, 0.12);
     padding: 10px 12px;
     outline: none;
     resize: none;
+    box-sizing: border-box;
 }
 
+/* ===== Actions ===== */
 .ai-actions {
     display: flex;
     gap: 8px;
 }
 
 .ai-btn {
-    flex: 1;
+    flex: 1 1 0;
     height: 40px;
     border-radius: 12px;
-    border: 1px solid rgba(0,0,0,0.12);
+    border: 1px solid rgba(0, 0, 0, 0.12);
     background: #111;
     color: #fff;
     cursor: pointer;
@@ -118,6 +93,7 @@
     color: #111;
 }
 
+/* ===== Error ===== */
 .ai-error {
     padding: 10px;
     border-radius: 12px;
@@ -128,25 +104,101 @@
     white-space: pre-wrap;
 }
 
+/* =========================
+   Result Area
+   - Result container eats remaining height
+   - Files list: max-height + scroll
+   - Text box: MAIN scroll owner
+========================= */
+
 .ai-result {
-    display: grid;
+    flex: 1 1 auto;
+    min-height: 0;
+
+    display: flex;
+    flex-direction: column;
     gap: 6px;
 }
 
 .ai-result__label {
+    flex: 0 0 auto;
     font-weight: 800;
     font-size: 12px;
     opacity: 0.75;
 }
 
+/* ✅ 파일 리스트: 있으면 이 클래스로 감싸기 */
+.ai-result__files {
+    flex: 0 0 auto;
+
+    max-height: 160px;      /* 필요하면 140~200 조절 */
+    overflow-y: auto;
+
+    padding-right: 6px;
+}
+
+/* ✅ 텍스트 결과: 남은 공간 + 메인 스크롤 */
 .ai-result__box {
-    height: 240px;
-    overflow: auto;
+    flex: 1 1 auto;
+    min-height: 120px;
+
+    overflow-y: auto;
+
     border-radius: 12px;
-    border: 1px solid rgba(0,0,0,0.10);
+    border: 1px solid rgba(0, 0, 0, 0.10);
     padding: 10px 12px;
     background: #fafafa;
+
     white-space: pre-wrap;
     line-height: 1.4;
     font-size: 13px;
+    box-sizing: border-box;
+}
+
+/* =========================
+   File Row (one-line)
+========================= */
+.ai-file-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+}
+
+/* room 버튼 고정폭 */
+.ai-file-row .ai-room-btn {
+    flex: 0 0 auto;
+}
+
+/* 파일명 말줄임 */
+.ai-file-row .ai-file-name {
+    flex: 1 1 auto;
+    min-width: 0;           /* ✅ 말줄임 필수 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 다운로드 버튼 고정 */
+.ai-file-row .ai-dl-btn {
+    flex: 0 0 auto;
+}
+
+/* ===== Optional: scroll bar look (취향) ===== */
+.ai-result__files::-webkit-scrollbar,
+.ai-result__box::-webkit-scrollbar {
+    width: 10px;
+}
+.ai-result__files::-webkit-scrollbar-thumb,
+.ai-result__box::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.18);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+}
+
+/* ===== Slide animation ===== */
+@keyframes aiSlideUp {
+    from { transform: translateY(10px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
 }

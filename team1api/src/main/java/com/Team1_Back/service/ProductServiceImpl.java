@@ -37,7 +37,7 @@ public class ProductServiceImpl implements ProductService {
         Pageable pageable = PageRequest.of(
                 pageRequestDTO.getPage() < 0 ? 0 : pageRequestDTO.getPage() - 1, // 0보다 작으면 0으로 보정
                 pageRequestDTO.getSize(),
-                Sort.by("ord").ascending() // 
+                Sort.by("ord").ascending() //
         );
 
         // 검색 분기 처리
@@ -45,7 +45,7 @@ public class ProductServiceImpl implements ProductService {
         String category = pageRequestDTO.getCategory();
 
         // 1) 카테고리 필터링 ("All"이 아니고 값이 있을 때)
-        if(category != null && !category.equals("All") && !category.isEmpty()) {
+        if (category != null && !category.equals("All") && !category.isEmpty()) {
             result = productRepository.findByCategory(category, pageable);
         } else {
             // 2) 전체 검색 (조건 없는 selectList 호출)
@@ -57,11 +57,10 @@ public class ProductServiceImpl implements ProductService {
                 .map(product -> entityToDTO(product))
                 .collect(Collectors.toList());
 
-        return PageResponseDTO.<ProductDTO>withAll()
-                .dtoList(dtoList)
-                .totalCount(result.getTotalElements())
-                .pageRequestDTO(pageRequestDTO)
-                .build();
+        return PageResponseDTO.<ProductDTO>of(
+                dtoList,
+                pageRequestDTO,
+                result.getTotalElements());
     }
 
     // 2. 등록
@@ -94,7 +93,7 @@ public class ProductServiceImpl implements ProductService {
 
         product.clearList();
         List<String> uploadFileNames = productDTO.getUploadFileNames();
-        if(uploadFileNames != null && !uploadFileNames.isEmpty()){
+        if (uploadFileNames != null && !uploadFileNames.isEmpty()) {
             uploadFileNames.forEach(product::addImageString);
         }
         productRepository.save(product);
@@ -111,7 +110,7 @@ public class ProductServiceImpl implements ProductService {
     public void changeOrder(List<Long> pnoList) {
         for (int i = 0; i < pnoList.size(); i++) {
             final int num = i; // ✨ [핵심] i를 'final' 변수에 담아서 고정시킴
-            
+
             Long pno = pnoList.get(i);
             productRepository.findById(pno).ifPresent(product -> {
                 product.changeOrd(num); // ✨ i 대신 num을 사용하면 에러 끝!
@@ -121,7 +120,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     // 변환 메서드들 (status 빨간 줄 해결)
-    private ProductDTO entityToDTO(Product product){
+    private ProductDTO entityToDTO(Product product) {
         ProductDTO productDTO = ProductDTO.builder()
                 .pno(product.getPno())
                 .pname(product.getPname())
@@ -132,7 +131,7 @@ public class ProductServiceImpl implements ProductService {
                 .delFlag(product.isDelFlag())
                 .status(product.isStatus()) // ✨ 1, 2단계 적용하면 이제 인식됨!
                 .build();
-        
+
         // ... 이미지 처리 로직 (그대로 유지) ...
         List<String> fileNameList = new ArrayList<>();
         if (product.getImageList() != null && !product.getImageList().isEmpty()) {
@@ -147,7 +146,7 @@ public class ProductServiceImpl implements ProductService {
         return productDTO;
     }
 
-    private Product dtoToEntity(ProductDTO productDTO){
+    private Product dtoToEntity(ProductDTO productDTO) {
         Product product = Product.builder()
                 .pno(productDTO.getPno())
                 .pname(productDTO.getPname())
@@ -161,7 +160,7 @@ public class ProductServiceImpl implements ProductService {
 
         // ... 이미지 처리 로직 (그대로 유지) ...
         List<String> uploadFileNames = productDTO.getUploadFileNames();
-        if(uploadFileNames != null){
+        if (uploadFileNames != null) {
             uploadFileNames.forEach(product::addImageString);
         }
         return product;
