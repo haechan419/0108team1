@@ -49,13 +49,6 @@ const beforeReq = (config) => {
 
     console.log("[REQ]", method, (config.baseURL || "") + url);
 
-    // ✅ FormData를 사용하는 경우 Content-Type 헤더를 제거
-    // axios가 자동으로 "multipart/form-data; boundary=..." 형식으로 설정함
-    if (config.data instanceof FormData) {
-        delete config.headers["Content-Type"];
-        console.log("[REQ] FormData detected - Content-Type 헤더 제거");
-    }
-
     // ✅ /auth/** 는 토큰 붙이지 않음 (로그인 시점에 token 없거나 꼬이는 거 방지)
     if (!isAuthEndpoint(url)) {
         const memberInfo = getCookie("member");
@@ -145,18 +138,6 @@ const responseFail = async (err) => {
 
 // 공통 토큰 갱신 처리 함수 (내부 사용)
 async function handleTokenRefresh(originalConfig) {
-    // ✅ 무한 루프 방지: 이미 토큰 갱신 시도 중인 요청인지 확인
-    if (originalConfig._retry) {
-        console.error("[JWT] 토큰 갱신 실패 - 무한 루프 방지");
-        return Promise.reject({
-            response: {
-                status: 401,
-                data: {error: "TOKEN_REFRESH_FAILED"},
-            },
-        });
-    }
-    originalConfig._retry = true;
-
     const memberCookieValue = getCookie("member");
 
     if (!memberCookieValue || !memberCookieValue.refreshToken) {
@@ -185,18 +166,11 @@ async function handleTokenRefresh(originalConfig) {
         memberCookieValue.refreshToken = result.refreshToken;
         setCookie("member", memberCookieValue, 1);
 
-        // ✅ 새 토큰으로 Authorization 헤더 설정
         originalConfig.headers.Authorization = `Bearer ${result.accessToken}`;
-        
-        // ✅ FormData인 경우 Content-Type 헤더 제거 (재요청 시에도 유지)
-        if (originalConfig.data instanceof FormData) {
-            delete originalConfig.headers["Content-Type"];
-        }
 
         return await jwtAxios(originalConfig);
     } catch (error) {
         console.error("[JWT] 토큰 갱신 실패:", error);
-        removeCookie("member"); // 토큰 갱신 실패 시 쿠키 삭제
         return Promise.reject(error);
     }
 }

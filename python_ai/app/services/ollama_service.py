@@ -9,7 +9,7 @@ from datetime import datetime
 class OllamaService:
     def __init__(self, base_url: str = "http://localhost:11434"):
         self.base_url = base_url
-        self.model = "qwen2.5:3b"
+        self.model = "llama3.2"
     
     def analyze_intent(self, user_prompt: str) -> dict:
         """사용자 질문 → JSON 의도 추출"""

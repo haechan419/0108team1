@@ -80,7 +80,7 @@ public class ReportService {
         return generateCore(
                 principal.userId(),
                 principal.role(),
-                principal.departmentName(), // 요청자(로그인한 사람) 부서명
+                principal.departmentName(), // 요청자(로그인한 사람) 부서
                 req
         );
     }
@@ -89,9 +89,9 @@ public class ReportService {
         // SYSTEM 실행 가정
         Long systemUserId = 0L;
         String role = "ADMIN";
-        String requesterDeptName = null;
+        String departmentName = null; // 시스템 요청자 부서 스냅샷은 필요 없으면 null
 
-        return generateCore(systemUserId, role, requesterDeptName, req);
+        return generateCore(systemUserId, role, departmentName, req);
     }
 
     private ReportGenerateResult generateCore(
@@ -104,9 +104,6 @@ public class ReportService {
         if (req == null || req.getFilters() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid request");
         }
-
-        // ✅ filters 변수 선언 (Cannot resolve symbol 'filters' 해결)
-        ReportGenerateRequestDTO.Filters filters = req.getFilters();
 
         // -------------------------
         // 1) 타입 검증
@@ -131,11 +128,11 @@ public class ReportService {
         // 3) format 검증
         // -------------------------
         OutputFormat expectedFormat =
-                (filters.getFormat() == null)
+                (req.getFilters().getFormat() == null)
                         ? parseFormat(type.format())
-                        : parseFormat(filters.getFormat());
+                        : parseFormat(req.getFilters().getFormat());
 
-        String reqFormat = safeUpper(filters.getFormat());
+        String reqFormat = safeUpper(req.getFilters().getFormat());
         if (reqFormat != null && !reqFormat.equals(expectedFormat.name())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Format mismatch");
         }
@@ -143,12 +140,12 @@ public class ReportService {
         // -------------------------
         // 4) scope 확정
         // -------------------------
-        DataScope scope = resolveScope(isAdmin, safeUpper(filters.getDataScope()));
+        DataScope scope = resolveScope(isAdmin, safeUpper(req.getFilters().getDataScope()));
 
-        // ✅ DEPT scope면 "조회 대상 부서"는 filters.department로 강제
+        // ✅ DEPT scope면 "조회 대상 부서"는 프론트 filters.department로 강제
         String targetDept = null;
         if (scope == DataScope.DEPT) {
-            targetDept = (filters.getDepartment() == null) ? null : filters.getDepartment().trim();
+            targetDept = req.getFilters().getDepartment();
             if (targetDept == null || targetDept.isBlank()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Department is required for DEPT scope");
             }
@@ -160,38 +157,32 @@ public class ReportService {
         // -------------------------
         // 5) category JSON
         // -------------------------
-        String categoryJson = toJsonArray(filters.getCategory());
+        String categoryJson = toJsonArray(req.getFilters().getCategory());
 
         // -------------------------
-        // 6) job 생성 + snapshot 세팅
+        // 6) job 생성
         // -------------------------
         ReportJob job = new ReportJob();
         job.setRequestedBy(requestedBy);
         job.setRoleSnapshot(role);
         job.setReportTypeId(type.id());
-        job.setPeriod(filters.getPeriod());
+        job.setPeriod(req.getFilters().getPeriod());
         job.setDataScope(scope);
         job.setCategoryJson(categoryJson);
         job.setOutputFormat(expectedFormat);
         job.setStatus(ReportStatus.GENERATING);
 
-        // ✅ snapshot 정책 (여기서만 결정!)
-        // - DEPT: targetDept(=filters.department) "개발2팀"
-        // - MY  : requesterDepartmentName (있으면)
-        // - ALL : null
-        String snapshotDept;
+        // ✅ snapshot 정책
+        // - DEPT: targetDept(=filters.department)
+        // - MY: requesterDepartmentName(요청자 부서) 넣어도 되고 null이어도 됨(선택)
+        // - ALL: null 권장
         if (scope == DataScope.DEPT) {
-            snapshotDept = targetDept; // ✅ 무조건 문자열 부서명
+            job.setDepartmentSnapshot(targetDept);
         } else if (scope == DataScope.MY) {
-            snapshotDept = (requesterDepartmentName == null) ? null : requesterDepartmentName.trim();
+            job.setDepartmentSnapshot(requesterDepartmentName); // 선택: 남겨두면 감사로그/증빙에 좋음
         } else {
-            snapshotDept = null;
+            job.setDepartmentSnapshot(null);
         }
-        job.setDepartmentSnapshot(snapshotDept);
-
-        log.warn("[GEN] filters.department(raw)='{}'", filters.getDepartment());
-        log.warn("[GEN] job.departmentSnapshot='{}'", job.getDepartmentSnapshot());
-        log.warn("[GEN] filters.period='{}', dataScope(raw)='{}'", filters.getPeriod(), filters.getDataScope());
 
         LocalDate[] range = toMonthRangeOrNull(job.getPeriod());
         if (range != null) {
@@ -199,8 +190,7 @@ public class ReportService {
             job.setPeriodEnd(range[1]);
         }
 
-        // ✅ 저장 + flush (id 확보 & snapshot DB 반영)
-        ReportJob saved = reportJobRepository.saveAndFlush(job);
+        ReportJob saved = reportJobRepository.save(job);
         Long reportId = saved.getId();
 
         // -------------------------
@@ -227,8 +217,9 @@ public class ReportService {
         Path outputFile = dir.resolve(fileName);
 
         // -------------------------
-        // 8) EXPENSE 승인 합계 리포트면 미리 계산해서 DB에 저장
+        // 8) 생성 실행 직전: EXPENSE 승인 합계 리포트면 미리 계산해서 transient 값 주입
         // -------------------------
+
         boolean isExpenseApprovedReport =
                 ReportTypes.EXPENSE_APPROVED_SUMMARY_PDF.equals(saved.getReportTypeId()) ||
                         ReportTypes.EXPENSE_APPROVED_SUMMARY_EXCEL.equals(saved.getReportTypeId());
@@ -238,77 +229,89 @@ public class ReportService {
 
         if (isExpenseApprovedReport) {
 
-            LocalDate startDate = saved.getPeriodStart(); // 2025-12-01
-            LocalDate endDate   = saved.getPeriodEnd();   // 2025-12-31
+            LocalDate start = saved.getPeriodStart();
+            LocalDate end = saved.getPeriodEnd();
+
+            if (start == null || end == null) {
+                saved.setStatus(ReportStatus.FAILED);
+                saved.setErrorMessage("Period must be 'YYYY-MM' for expense approved report");
+                reportJobRepository.save(saved);
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid period format");
+            }
+
+            // ✅ LocalDate → LocalDateTime 범위로 변환 (end는 exclusive)
+            // - periodEnd가 "다음달 1일"이면 그대로 end.atStartOfDay()
+            // - periodEnd가 "그 달 마지막날"이면 +1 day 해서 exclusive로
+            LocalDateTime startDt = start.atStartOfDay();
+            LocalDateTime endDt = end.atStartOfDay();
+
+            // end가 start+1month 1일이 아니면, inclusive-end로 들어온 걸로 보고 +1day 처리
+            LocalDate firstOfNextMonth = start.withDayOfMonth(1).plusMonths(1);
+            if (!end.equals(firstOfNextMonth)) {
+                endDt = end.plusDays(1).atStartOfDay();
+            }
 
             ApprovedAgg agg = switch (saved.getDataScope()) {
-                case ALL -> reportQueryRepository.approvedSumAll(startDate, endDate);
-                case MY  -> reportQueryRepository.approvedSumByUser(saved.getRequestedBy(), startDate, endDate);
+                case ALL -> reportQueryRepository.approvedSumAll(startDt, endDt);
+
+                case MY -> reportQueryRepository.approvedSumByUser(saved.getRequestedBy(), startDt, endDt);
+
                 case DEPT -> {
-                    String dept = saved.getDepartmentSnapshot();
+                    String dept = saved.getDepartmentSnapshot(); // ✅ DEPT면 targetDept가 들어있음
                     if (dept == null || dept.isBlank()) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Department is required for DEPT scope");
                     }
-                    yield reportQueryRepository.approvedSumByDept(dept.trim(), startDate, endDate);
+                    yield reportQueryRepository.approvedSumByDept(dept.trim(), startDt, endDt);
                 }
             };
 
             long total = (agg == null || agg.getTotal() == null) ? 0L : agg.getTotal();
-            int count  = (agg == null || agg.getCnt() == null) ? 0 : agg.getCnt().intValue();
+            int count = (agg == null || agg.getCnt() == null) ? 0 : agg.getCnt().intValue();
 
             log.warn("[EXP] scope={}, startDt={}, endDt={}, requestedBy={}, deptSnapshot={}",
-                    saved.getDataScope(), startDate, endDate, saved.getRequestedBy(), saved.getDepartmentSnapshot());
+                    saved.getDataScope(), startDt, endDt, saved.getRequestedBy(), saved.getDepartmentSnapshot());
             log.warn("[EXP] count={}, total={}", count, total);
 
             saved.setApprovedTotal(total);
             saved.setApprovedCount(count);
-
-            // ✅ 여기서 flush까지 해서 "freshJob"로 파일 생성
-            reportJobRepository.saveAndFlush(saved);
+            reportJobRepository.save(saved);
         }
 
-        // ✅ DB에서 최신 값 다시 읽어오기 (PDF/EXCEL이 다른 값 보는 문제 방지)
-        ReportJob freshJob = reportJobRepository.findById(saved.getId()).orElseThrow();
-
-        log.warn("[GEN] freshJob.departmentSnapshot='{}'", freshJob.getDepartmentSnapshot());
-        log.warn("[GEN] freshJob.approvedCount={}, approvedTotal={}",
-                freshJob.getApprovedCount(), freshJob.getApprovedTotal());
 
         // -------------------------
-        // 9) 실제 파일 생성 (✅ freshJob 사용)
+        // 9) 실제 파일 생성
         // -------------------------
         try {
             if (expectedFormat == OutputFormat.PDF) {
-                pdfGen.generate(outputFile, freshJob);
+                pdfGen.generate(outputFile, saved);
             } else {
-                excelGen.generate(outputFile, freshJob);
+                excelGen.generate(outputFile, saved);
             }
 
             long size = Files.size(outputFile);
             String checksum = sha256Hex(outputFile);
 
             ReportFile rf = saveOrReuseReportFile(
-                    freshJob, fileName, outputFile, expectedFormat, size, checksum
+                    saved, fileName, outputFile, expectedFormat, size, checksum
             );
 
-            freshJob.setStatus(ReportStatus.READY);
-            freshJob.setFileName(rf.getFileName());
-            freshJob.setFilePath(outputFile.toString());
-            freshJob.setErrorMessage(null);
-            reportJobRepository.save(freshJob);
+            saved.setStatus(ReportStatus.READY);
+            saved.setFileName(rf.getFileName());
+            saved.setFilePath(outputFile.toString());
+            saved.setErrorMessage(null);
+            reportJobRepository.save(saved);
 
-            return new ReportGenerateResult(reportId, freshJob.getStatus().name(), rf.getFileName());
+            return new ReportGenerateResult(reportId, saved.getStatus().name(), rf.getFileName());
 
         } catch (Exception e) {
-            freshJob.setStatus(ReportStatus.FAILED);
-            freshJob.setErrorMessage(e.getMessage());
-            freshJob.setFileName(null);
-            freshJob.setFilePath(null);
-            reportJobRepository.save(freshJob);
+            saved.setStatus(ReportStatus.FAILED);
+            saved.setErrorMessage(e.getMessage());
+            saved.setFileName(null);
+            saved.setFilePath(null);
+            reportJobRepository.save(saved);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Generate failed");
         }
     }
-
 
 
     @Transactional

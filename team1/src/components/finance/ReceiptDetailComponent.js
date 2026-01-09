@@ -1,269 +1,248 @@
 import { useEffect, useState } from "react";
-import { getReceipt, getReceiptImage } from "../../api/receiptApi";
+import { getReceipt, getExtraction, getReceiptImage } from "../../api/receiptApi";
 import useCustomMove from "../../hooks/useCustomMove";
 import FetchingModal from "../common/FetchingModal";
 import "./ReceiptDetailComponent.css";
 
 const initState = {
-    id: 0,
-    expenseId: 0,
-    fileUrl: "",
-    fileHash: "",
-    uploadedByName: "",
-    createdAt: null,
+  id: 0,
+  expenseId: 0,
+  fileUrl: "",
+  fileHash: "",
+  uploadedByName: "",
+  createdAt: null,
+};
+
+const initExtraction = {
+  receiptId: 0,
+  modelName: "",
+  extractedDate: null,
+  extractedAmount: null,
+  extractedMerchant: "",
+  extractedCategory: "",
+  confidence: null,
+  extractedJson: null,
+  createdAt: null,
 };
 
 const ReceiptDetailComponent = ({ id }) => {
-    const [receipt, setReceipt] = useState(initState);
-    const [imageUrl, setImageUrl] = useState(null);
-    const [fetching, setFetching] = useState(false);
-    const [error, setError] = useState(null);
+  const [receipt, setReceipt] = useState(initState);
+  const [extraction, setExtraction] = useState(initExtraction);
+  const [imageUrl, setImageUrl] = useState(null);
+  const [fetching, setFetching] = useState(false);
+  const [error, setError] = useState(null);
 
-    const { moveToExpenseDetail, moveToExpenseList } = useCustomMove();
+  const { moveToExpenseDetail, moveToExpenseList } = useCustomMove();
 
-    useEffect(() => {
-        // id가 없거나 유효하지 않으면 에러 표시
-        if (!id || id === "undefined" || isNaN(parseInt(id))) {
-            setError("영수증 ID가 올바르지 않습니다.");
-            setFetching(false);
-            return;
-        }
-
-        setFetching(true);
-        setError(null);
-
-        // 영수증 정보 조회
-        getReceipt(id)
-            .then((data) => {
-                setReceipt(data);
-                // 이미지 로드
-                loadImage(id);
-            })
-            .catch((err) => {
-                console.error("영수증 조회 실패:", err);
-                setError("영수증을 불러올 수 없습니다. " + (err.response?.data?.message || err.message || ""));
-            })
-            .finally(() => {
-                setFetching(false);
-            });
-    }, [id]);
-
-    const loadImage = async (receiptId) => {
-        try {
-            // ✅ 수정: getReceiptImage가 이미 blob 데이터를 반환하므로 직접 사용
-            const blobData = await getReceiptImage(receiptId);
-            const url = URL.createObjectURL(blobData);
-            setImageUrl(url);
-        } catch (error) {
-            console.error("영수증 이미지 로드 실패:", error);
-        }
-    };
-
-
-    // 에러가 있거나 id가 없으면 에러 메시지 표시
-    if (error || !id || id === "undefined") {
-        return (
-            <div className="border-2 border-sky-200 mt-10 m-2 p-4">
-                <div className="text-center p-8">
-                    <div className="text-red-500 text-xl font-bold mb-4">오류</div>
-                    <p className="text-gray-600 mb-4">{error || "영수증 ID가 필요합니다."}</p>
-                    <button
-                        type="button"
-                        className="rounded p-4 m-2 text-xl w-32 text-white bg-blue-500"
-                        onClick={moveToExpenseList}
-                    >
-                        목록으로
-                    </button>
-                </div>
-            </div>
-        );
+  useEffect(() => {
+    // id가 없거나 유효하지 않으면 에러 표시
+    if (!id || id === "undefined" || isNaN(parseInt(id))) {
+      setError("영수증 ID가 올바르지 않습니다.");
+      setFetching(false);
+      return;
     }
 
+    setFetching(true);
+    setError(null);
+
+    // 영수증 정보 조회
+    getReceipt(id)
+      .then((data) => {
+        setReceipt(data);
+        // 이미지 로드
+        loadImage(id);
+      })
+      .catch((err) => {
+        console.error("영수증 조회 실패:", err);
+        setError("영수증을 불러올 수 없습니다. " + (err.response?.data?.message || err.message || ""));
+      })
+      .finally(() => {
+        setFetching(false);
+      });
+
+    // OCR 추출 결과 조회
+    getExtraction(id)
+      .then((data) => {
+        setExtraction(data);
+      })
+      .catch((err) => {
+        console.error("OCR 결과 조회 실패:", err);
+        // OCR 결과가 없을 수 있으므로 에러는 무시
+      });
+  }, [id]);
+
+  const loadImage = async (receiptId) => {
+    try {
+      const response = await getReceiptImage(receiptId);
+      const blob = new Blob([response.data], { type: "image/jpeg" });
+      const url = URL.createObjectURL(blob);
+      setImageUrl(url);
+    } catch (error) {
+      console.error("영수증 이미지 로드 실패:", error);
+    }
+  };
+
+  const handleApplyExtraction = () => {
+    if (extraction && window.confirm("OCR 추출 결과를 지출 내역에 적용하시겠습니까?")) {
+      if (receipt.expenseId) {
+        moveToExpenseDetail(receipt.expenseId);
+      }
+    }
+  };
+
+  const makeDiv = (title, value) => (
+    <div className="flex justify-center">
+      <div className="relative mb-4 flex w-full flex-wrap items-stretch">
+        <div className="w-1/5 p-6 text-right font-bold">{title}</div>
+        <div className="w-4/5 p-6 rounded-r border border-solid shadow-md">{value}</div>
+      </div>
+    </div>
+  );
+
+  // 에러가 있거나 id가 없으면 에러 메시지 표시
+  if (error || !id || id === "undefined") {
     return (
-        <div style={{ padding: '20px', backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
-            {fetching ? <FetchingModal /> : <></>}
-
-            {/* 페이지 헤더 */}
-            <div style={{
-                backgroundColor: 'white',
-                padding: '20px',
-                borderRadius: '4px',
-                marginBottom: '16px',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
-            }}>
-                <h1 style={{
-                    fontSize: '20px',
-                    fontWeight: 600,
-                    color: '#1f2937',
-                    margin: 0
-                }}>
-                    영수증 상세
-                </h1>
-            </div>
-
-            {/* 영수증 이미지 카드 */}
-            <div style={{
-                backgroundColor: 'white',
-                borderRadius: '4px',
-                padding: '24px',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                marginBottom: '16px'
-            }}>
-                <h2 style={{
-                    fontSize: '16px',
-                    fontWeight: 600,
-                    color: '#1f2937',
-                    margin: '0 0 16px 0'
-                }}>
-                    영수증 이미지
-                </h2>
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'flex-start',
-                    marginBottom: '24px'
-                }}>
-                    <div style={{
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '4px',
-                        padding: '16px',
-                        backgroundColor: '#f9fafb',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'flex-start',
-                        overflow: 'auto',
-                        maxWidth: '100%'
-                    }}>
-                        {imageUrl ? (
-                            <img
-                                src={imageUrl}
-                                alt="영수증"
-                                style={{
-                                    maxWidth: '400px',
-                                    maxHeight: '600px',
-                                    width: 'auto',
-                                    height: 'auto',
-                                    objectFit: 'contain'
-                                }}
-                            />
-                        ) : (
-                            <div style={{ color: '#6b7280', padding: '40px' }}>
-                                이미지를 불러오는 중...
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* 영수증 정보 */}
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(2, 1fr)',
-                    gap: '20px',
-                    borderTop: '1px solid #e5e7eb',
-                    paddingTop: '20px'
-                }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <label style={{
-                            fontSize: '12px',
-                            fontWeight: 500,
-                            color: '#6b7280'
-                        }}>
-                            업로드 일시
-                        </label>
-                        <span style={{ fontSize: '14px', color: '#1f2937' }}>
-              {receipt.createdAt ? new Date(receipt.createdAt).toLocaleString("ko-KR") : "-"}
-            </span>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <label style={{
-                            fontSize: '12px',
-                            fontWeight: 500,
-                            color: '#6b7280'
-                        }}>
-                            업로드자
-                        </label>
-                        <span style={{ fontSize: '14px', color: '#1f2937' }}>
-              {receipt.uploadedByName || "-"}
-            </span>
-                    </div>
-                    {receipt.fileHash && (
-                        <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '8px',
-                            gridColumn: '1 / -1'
-                        }}>
-                            <label style={{
-                                fontSize: '12px',
-                                fontWeight: 500,
-                                color: '#6b7280'
-                            }}>
-                                파일 해시
-                            </label>
-                            <span style={{
-                                fontSize: '12px',
-                                color: '#1f2937',
-                                fontFamily: 'monospace',
-                                backgroundColor: '#f9fafb',
-                                padding: '8px',
-                                borderRadius: '4px',
-                                wordBreak: 'break-all'
-                            }}>
-                {receipt.fileHash}
-              </span>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* 액션 버튼 */}
-            <div style={{
-                display: 'flex',
-                gap: '8px',
-                justifyContent: 'flex-end'
-            }}>
-                {receipt.expenseId > 0 && (
-                    <button
-                        type="button"
-                        onClick={() => moveToExpenseDetail(receipt.expenseId)}
-                        style={{
-                            padding: '10px 20px',
-                            backgroundColor: '#6b7280',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            fontSize: '14px',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            transition: 'background-color 0.2s'
-                        }}
-                        onMouseOver={(e) => e.target.style.backgroundColor = '#4b5563'}
-                        onMouseOut={(e) => e.target.style.backgroundColor = '#6b7280'}
-                    >
-                        지출 내역
-                    </button>
-                )}
-                <button
-                    type="button"
-                    onClick={moveToExpenseList}
-                    style={{
-                        padding: '10px 20px',
-                        backgroundColor: '#6b7280',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        transition: 'background-color 0.2s'
-                    }}
-                    onMouseOver={(e) => e.target.style.backgroundColor = '#4b5563'}
-                    onMouseOut={(e) => e.target.style.backgroundColor = '#6b7280'}
-                >
-                    목록
-                </button>
-            </div>
+      <div className="border-2 border-sky-200 mt-10 m-2 p-4">
+        <div className="text-center p-8">
+          <div className="text-red-500 text-xl font-bold mb-4">오류</div>
+          <p className="text-gray-600 mb-4">{error || "영수증 ID가 필요합니다."}</p>
+          <button
+            type="button"
+            className="rounded p-4 m-2 text-xl w-32 text-white bg-blue-500"
+            onClick={moveToExpenseList}
+          >
+            목록으로
+          </button>
         </div>
+      </div>
     );
+  }
+
+  return (
+    <div className="border-2 border-sky-200 mt-10 m-2 p-4">
+      {fetching ? <FetchingModal /> : <></>}
+
+      {/* 영수증 이미지 섹션 */}
+      <div className="mb-6">
+        <div className="text-2xl font-bold mb-4">영수증 이미지</div>
+        <div className="flex justify-center mb-4">
+          <div className="border-2 border-gray-300 rounded p-4 bg-gray-50 min-h-[400px] flex items-center justify-center">
+            {imageUrl ? (
+              <img src={imageUrl} alt="영수증" className="max-w-full max-h-[600px] object-contain" />
+            ) : (
+              <div className="text-gray-500">이미지를 불러오는 중...</div>
+            )}
+          </div>
+        </div>
+        {makeDiv("업로드 일시", receipt.createdAt ? new Date(receipt.createdAt).toLocaleString("ko-KR") : "-")}
+        {makeDiv("업로드자", receipt.uploadedByName || "-")}
+        {receipt.fileHash && makeDiv("파일 해시", <span className="font-mono text-xs">{receipt.fileHash}</span>)}
+      </div>
+
+      {/* OCR 추출 결과 섹션 */}
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <div className="text-2xl font-bold">AI 추출 결과</div>
+          {extraction && extraction.receiptId > 0 && (
+            <button
+              type="button"
+              className="inline-block rounded p-2 text-sm text-white bg-blue-500"
+              onClick={handleApplyExtraction}
+            >
+              결과 적용
+            </button>
+          )}
+        </div>
+
+        {extraction && extraction.receiptId > 0 ? (
+          <>
+            {makeDiv("모델명", extraction.modelName || "-")}
+            {makeDiv(
+              "신뢰도",
+              extraction.confidence ? `${(extraction.confidence * 100).toFixed(1)}%` : "-"
+            )}
+            {makeDiv(
+              "추출 일시",
+              extraction.createdAt ? new Date(extraction.createdAt).toLocaleString("ko-KR") : "-"
+            )}
+            {makeDiv("추출된 날짜", extraction.extractedDate || "-")}
+            {makeDiv(
+              "추출된 금액",
+              extraction.extractedAmount ? extraction.extractedAmount.toLocaleString() + "원" : "-"
+            )}
+            {makeDiv("추출된 가맹점명", extraction.extractedMerchant || "-")}
+            {makeDiv("추출된 카테고리", extraction.extractedCategory || "-")}
+
+            {extraction.extractedJson && (
+              <div className="mt-4">
+                <div className="flex justify-between items-center mb-2">
+                  <div className="font-bold">원본 JSON 데이터</div>
+                  <button
+                    type="button"
+                    className="text-xs p-1 bg-gray-200 rounded border border-gray-300"
+                    onClick={() => {
+                      try {
+                        const jsonText =
+                          typeof extraction.extractedJson === "string"
+                            ? extraction.extractedJson
+                            : JSON.stringify(extraction.extractedJson);
+                        navigator.clipboard.writeText(jsonText);
+                        alert("JSON 데이터가 클립보드에 복사되었습니다.");
+                      } catch (error) {
+                        console.error("복사 실패:", error);
+                      }
+                    }}
+                  >
+                    복사
+                  </button>
+                </div>
+                <pre className="bg-gray-900 text-gray-100 p-4 rounded overflow-auto max-h-[300px] text-xs">
+                  {(() => {
+                    try {
+                      const jsonObj =
+                        typeof extraction.extractedJson === "string"
+                          ? JSON.parse(extraction.extractedJson)
+                          : extraction.extractedJson;
+                      return JSON.stringify(jsonObj, null, 2);
+                    } catch (error) {
+                      return extraction.extractedJson;
+                    }
+                  })()}
+                </pre>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center p-8 text-gray-500">
+            <p>OCR 추출 결과가 없습니다.</p>
+            <p className="text-sm text-gray-400 mt-2">
+              영수증이 업로드된 후 OCR 처리가 완료되면 결과가 표시됩니다.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* 버튼 */}
+      <div className="flex justify-end p-4">
+        {receipt.expenseId > 0 && (
+          <button
+            type="button"
+            className="inline-block rounded p-4 m-2 text-xl w-32 text-white bg-green-500"
+            onClick={() => moveToExpenseDetail(receipt.expenseId)}
+          >
+            지출 내역
+          </button>
+        )}
+        <button
+          type="button"
+          className="rounded p-4 m-2 text-xl w-32 text-white bg-blue-500"
+          onClick={moveToExpenseList}
+        >
+          목록
+        </button>
+      </div>
+    </div>
+  );
 };
 
 export default ReceiptDetailComponent;

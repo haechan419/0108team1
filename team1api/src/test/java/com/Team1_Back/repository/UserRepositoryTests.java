@@ -1,5 +1,8 @@
 package com.Team1_Back.repository;
 
+import java.time.LocalDateTime;
+
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -23,7 +26,7 @@ public class UserRepositoryTests {
     @Test
     public void testUserInsert() {
         User user = User.builder()
-                .employeeNo("11111111")
+                .employeeNo("11111113")
                 .name("관리자")
                 .email("test@aaa.com")
                 .password(passwordEncoder.encode("1111"))
@@ -54,7 +57,7 @@ public class UserRepositoryTests {
                     .employeeNo(employeeNo)
                     .name("테스터" + i)
                     .email("test" + i + "@example.com")
-                    .password(passwordEncoder.encode("1234")) // 비밀번호는 동일하게 설정
+                    .password(passwordEncoder.encode("1111")) // 비밀번호는 동일하게 설정
                     .role(role)
                     .departmentName(deptName)
                     .isActive(true)

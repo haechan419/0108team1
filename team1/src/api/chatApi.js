@@ -49,21 +49,4 @@ export const chatApi = {
         return res.data;
     },
 
-    uploadAttachments: async (roomId, content, files) => {
-        const form = new FormData();
-        if (content != null) form.append("content", content); // "" 가능
-
-        if (files && files.length) {
-            for (const f of files) form.append("files", f);
-        }
-
-        const res = await jwtAxios.post(
-            `/chat/rooms/${roomId}/attachments`,
-            form,
-            {
-                headers: { "Content-Type": "multipart/form-data" },
-            }
-        );
-        return res.data; // { ok, messageId, attachments }
-    },
 };

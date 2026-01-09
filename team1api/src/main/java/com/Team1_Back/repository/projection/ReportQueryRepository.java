@@ -6,7 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
+
 public interface ReportQueryRepository extends JpaRepository<Expense, Long> {
 
     @Query(value = """
@@ -14,24 +15,24 @@ public interface ReportQueryRepository extends JpaRepository<Expense, Long> {
                COUNT(*) AS cnt
         FROM expense e
         WHERE e.approval_status = 'APPROVED'
-          AND e.receipt_date >= :start
-          AND e.receipt_date <= :end
+          AND e.created_at >= :start
+          AND e.created_at <  :end
         """, nativeQuery = true)
-    ApprovedAgg approvedSumAll(@Param("start") LocalDate start,
-                               @Param("end") LocalDate end);
+    ApprovedAgg approvedSumAll(@Param("start") LocalDateTime start,
+                               @Param("end") LocalDateTime end);
 
     @Query(value = """
         SELECT COALESCE(SUM(e.amount), 0) AS total,
                COUNT(*) AS cnt
         FROM expense e
         WHERE e.approval_status = 'APPROVED'
-          AND e.receipt_date >= :start
-          AND e.receipt_date <= :end
+          AND e.created_at >= :start
+          AND e.created_at <  :end
           AND e.user_id = :userId
         """, nativeQuery = true)
     ApprovedAgg approvedSumByUser(@Param("userId") Long userId,
-                                  @Param("start") LocalDate start,
-                                  @Param("end") LocalDate end);
+                                  @Param("start") LocalDateTime start,
+                                  @Param("end") LocalDateTime end);
 
     @Query(value = """
         SELECT COALESCE(SUM(e.amount), 0) AS total,
@@ -39,11 +40,11 @@ public interface ReportQueryRepository extends JpaRepository<Expense, Long> {
         FROM expense e
         JOIN users u ON u.id = e.user_id
         WHERE e.approval_status = 'APPROVED'
-          AND e.receipt_date >= :start
-          AND e.receipt_date <= :end
-          AND TRIM(u.department_name) = TRIM(:dept)
+          AND e.created_at >= :start
+          AND e.created_at <  :end
+          AND u.department_name = :dept
         """, nativeQuery = true)
     ApprovedAgg approvedSumByDept(@Param("dept") String dept,
-                                  @Param("start") LocalDate start,
-                                  @Param("end") LocalDate end);
+                                  @Param("start") LocalDateTime start,
+                                  @Param("end") LocalDateTime end);
 }

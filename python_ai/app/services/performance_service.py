@@ -20,15 +20,11 @@ class PerformanceService:
         self.ollama = ollama_service
         self.db_config = {
             'host': 'localhost',
-            'port': 3306,
+            'port': 3307,
             'user': 'root',
             'password': '1234',
             'database': 'team1db',
-            'charset': 'utf8mb4',
-            'connect_timeout': 10,  # 연결 타임아웃 (초)
-            'read_timeout': 10,      # 읽기 타임아웃 (초)
-            'write_timeout': 10,     # 쓰기 타임아웃 (초)
-            'autocommit': True       # 자동 커밋
+            'charset': 'utf8mb4'
         }
         # 유효한 부서 목록
         self.valid_departments = [
@@ -150,10 +146,7 @@ class PerformanceService:
         """DB에서 부서별 실적 조회"""
         conn = None
         try:
-            print(f"[DB] 연결 시도: {self.db_config['host']}:{self.db_config['port']} (DB: {self.db_config['database']})")
             conn = pymysql.connect(**self.db_config)
-            print(f"[DB] ✅ 연결 성공!")
-            
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 placeholders = ','.join(['%s'] * len(departments))
                 sql = f"""
@@ -165,38 +158,13 @@ class PerformanceService:
                     ORDER BY department_name, month
                 """
                 cursor.execute(sql, (*departments, year))
-                result = cursor.fetchall()
-                print(f"[DB] ✅ 조회 성공: {len(result)}건")
-                return result
-        except pymysql.OperationalError as e:
-            error_code = e.args[0] if e.args else None
-            error_msg = e.args[1] if len(e.args) > 1 else str(e)
-            print(f"[DB Error] 연결 오류 (코드: {error_code}): {error_msg}")
-            
-            if error_code == 2003:
-                print(f"[DB Error] 해결 방법:")
-                print(f"  1. MariaDB 서버가 실행 중인지 확인: net start MariaDB (관리자 권한 필요)")
-                print(f"  2. 포트 {self.db_config['port']}가 열려있는지 확인: netstat -an | findstr {self.db_config['port']}")
-                print(f"  3. host를 '127.0.0.1'로 설정했는지 확인 (현재: {self.db_config['host']})")
-            elif error_code == 1045:
-                print(f"[DB Error] 인증 실패: 사용자명 '{self.db_config['user']}' 또는 비밀번호 확인 필요")
-            elif error_code == 1049:
-                print(f"[DB Error] 데이터베이스 '{self.db_config['database']}'가 존재하지 않습니다")
-                print(f"  사용 가능한 데이터베이스를 확인하세요: SHOW DATABASES;")
-            
-            return []
-        except pymysql.Error as e:
-            print(f"[DB Error] MySQL/MariaDB 오류: {e}")
-            return []
+                return cursor.fetchall()
         except Exception as e:
-            print(f"[DB Error] 예상치 못한 오류: {type(e).__name__}: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"[DB Error] {e}")
             return []
         finally:
             if conn:
                 conn.close()
-                print(f"[DB] 연결 종료")
     
     def _generate_summary(self, data: List[Dict], departments: List[str], year: int) -> str:
         """실적 요약 텍스트 생성"""

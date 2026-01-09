@@ -2,11 +2,7 @@ import {useParams} from "react-router-dom";
 import ReceiptDetailComponent from "../../components/finance/ReceiptDetailComponent";
 import AppLayout from "../../components/layout/AppLayout";
 
-/**
- * 영수증 상세 페이지 컴포넌트
- *
- * @component
- */
+// D:\uj\fullstack 패턴: Page는 단순히 useParams로 id 받아서 Component에 전달
 const ReceiptDetailPage = () => {
     const {id} = useParams();
 
@@ -26,6 +22,8 @@ const ReceiptDetailPage = () => {
     return (
         <AppLayout>
             <div className="p-4 w-full bg-white">
+                <div className="text-3xl font-extrabold">Receipt Detail Page</div>
+
                 <ReceiptDetailComponent id={id}></ReceiptDetailComponent>
             </div>
         </AppLayout>

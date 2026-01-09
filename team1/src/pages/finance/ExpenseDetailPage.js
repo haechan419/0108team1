@@ -1,12 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import {
-    fetchExpense,
-    submitExpense,
-    deleteExpense,
-} from "../../slices/expenseSlice";
+import { fetchExpense, submitExpense, deleteExpense } from "../../slices/expenseSlice";
 import { getApprovalLogs } from "../../api/approvalApi";
+import ReceiptUpload from "../../components/finance/ReceiptUpload";
 import "./ExpenseDetailPage.css";
 import AppLayout from "../../components/layout/AppLayout";
 import jwtAxios from "../../util/jwtUtil";
@@ -18,7 +15,6 @@ const ExpenseDetailPage = () => {
     const [searchParams] = useSearchParams();
     const { currentExpense, loading } = useSelector((state) => state.expense);
     const [approvalLogs, setApprovalLogs] = useState([]);
-    const [loadingLogs, setLoadingLogs] = useState(false);
 
     useEffect(() => {
         if (id) {
@@ -36,63 +32,47 @@ const ExpenseDetailPage = () => {
         // DRAFT 상태는 ApprovalRequest가 없으므로 결재 이력이 없음
         if (currentExpense.status === "DRAFT") {
             setApprovalLogs([]);
-            setLoadingLogs(false);
             return;
         }
 
-        setLoadingLogs(true);
         try {
             // Expense ID로 ApprovalRequest 찾기 (list API에서 필터링)
             const res = await jwtAxios.get(`/approval-requests/list`, {
-                params: { requestType: "EXPENSE", size: 100 },
+                params: { requestType: "EXPENSE", size: 100 }
             });
 
-            // Spring Pageable 응답 구조: content 배열 사용
-            const approvalRequests = res.data?.content || res.data?.dtoList || [];
-
-            if (approvalRequests.length > 0) {
-                const approvalRequest = approvalRequests.find(
+            if (res.data && res.data.dtoList) {
+                const approvalRequest = res.data.dtoList.find(
                     (ar) => ar.refId === parseInt(id)
                 );
 
                 // ApprovalRequest가 있고 id가 유효한 경우에만 로그 조회
                 if (approvalRequest && approvalRequest.id) {
                     const logs = await getApprovalLogs(approvalRequest.id);
-                    // logs가 배열인지 확인 (API 응답이 배열로 직접 오는지 확인)
-                    const logsArray = Array.isArray(logs)
-                        ? logs
-                        : logs?.dtoList || logs?.data || [];
-                    setApprovalLogs(logsArray);
+                    setApprovalLogs(logs || []);
                 } else {
                     setApprovalLogs([]);
                 }
-            } else {
-                setApprovalLogs([]);
             }
         } catch (error) {
             console.error("결재 이력 로드 실패:", error);
             setApprovalLogs([]);
-        } finally {
-            setLoadingLogs(false);
         }
     };
 
-    const handleSubmit = async () => {
+    const handleSubmit = () => {
         if (id) {
-            try {
-                await dispatch(submitExpense({ id: parseInt(id) })).unwrap();
-                const queryString = searchParams.toString();
-                navigate(`/receipt/expenses${queryString ? `?${queryString}` : ""}`);
-            } catch (error) {
-                console.error("제출 실패:", error);
-                alert("제출에 실패했습니다. 다시 시도해주세요.");
-            }
+            dispatch(submitExpense({ id: parseInt(id) }));
+            // URL 쿼리 파라미터를 유지하여 목록 페이지로 이동 (mall 패턴)
+            const queryString = searchParams.toString();
+            navigate(`/receipt/expenses${queryString ? `?${queryString}` : ""}`);
         }
     };
 
     const handleDelete = () => {
         if (id && window.confirm("정말 삭제하시겠습니까?")) {
             dispatch(deleteExpense(parseInt(id)));
+            // URL 쿼리 파라미터를 유지하여 목록 페이지로 이동 (mall 패턴)
             const queryString = searchParams.toString();
             navigate(`/receipt/expenses${queryString ? `?${queryString}` : ""}`);
         }
@@ -104,16 +84,12 @@ const ExpenseDetailPage = () => {
         }
     };
 
+
     if (loading) {
         return (
-            <AppLayout>
-                <div className="expense-detail-page">
-                    <div className="page-loading-container">
-                        <div className="page-loading-spinner"></div>
-                        <p className="page-loading-text">지출 정보를 불러오는 중입니다</p>
-                    </div>
-                </div>
-            </AppLayout>
+            <div className="expense-detail-page">
+                <div className="loading">로딩 중...</div>
+            </div>
         );
     }
 
@@ -143,55 +119,48 @@ const ExpenseDetailPage = () => {
                 <div className="page-header-with-tab">
                     <div className="page-title-section">
                         <h1 className="page-title">지출 내역 상세</h1>
-                        <button
-                            className="close-tab-btn"
-                            onClick={() => {
-                                const queryString = searchParams.toString();
-                                navigate(
-                                    `/receipt/expenses${queryString ? `?${queryString}` : ""}`
-                                );
-                            }}
-                        >
+                        <button className="close-tab-btn" onClick={() => {
+                            // URL 쿼리 파라미터를 유지하여 목록 페이지로 이동 (mall 패턴)
+                            const queryString = searchParams.toString();
+                            navigate(`/receipt/expenses${queryString ? `?${queryString}` : ""}`);
+                        }}>
                             ×
                         </button>
                     </div>
                 </div>
 
-                {currentExpense.status === "DRAFT" && (
-                    <div className="detail-actions-bar">
-                        <button
-                            className="btn btn-outline"
-                            onClick={() => {
-                                const queryString = searchParams.toString();
-                                navigate(
-                                    `/receipt/expenses/${id}/edit${
-                                        queryString ? `?${queryString}` : ""
-                                    }`
-                                );
-                            }}
-                        >
-                            수정
-                        </button>
-                        <button className="btn btn-danger" onClick={handleDelete}>
-                            삭제
-                        </button>
-                        <button className="btn btn-primary" onClick={handleSubmit}>
-                            제출
-                        </button>
-                    </div>
-                )}
+                <div className="detail-actions-bar">
+                    {currentExpense.status === "DRAFT" && (
+                        <>
+                            <button className="btn btn-outline"
+                                onClick={() => navigate(`/receipt/expenses/${id}/edit`)}>
+                                수정
+                            </button>
+                            <button className="btn btn-danger" onClick={handleDelete}>
+                                삭제
+                            </button>
+                            <button className="btn btn-primary" onClick={handleSubmit}>
+                                제출
+                            </button>
+                        </>
+                    )}
+                    <button className="btn btn-secondary" onClick={() => {
+                        // URL 쿼리 파라미터를 유지하여 목록 페이지로 이동 (mall 패턴)
+                        const queryString = searchParams.toString();
+                        navigate(`/receipt/expenses${queryString ? `?${queryString}` : ""}`);
+                    }}>
+                        목록
+                    </button>
+                </div>
 
                 <div className="detail-card">
                     <div className="detail-grid">
                         <div className="detail-item">
                             <label>전자결재 상태</label>
                             <span
-                                className={`status-badge status-${
-                                    currentExpense.status?.toLowerCase().replace("_", "-") || ""
-                                }`}
-                            >
-                {getStatusLabel(currentExpense.status)}
-              </span>
+                                className={`status-badge status-${currentExpense.status?.toLowerCase().replace("_", "-") || ""}`}>
+                                {getStatusLabel(currentExpense.status)}
+                            </span>
                         </div>
                         <div className="detail-item">
                             <label>지출 일자</label>
@@ -204,111 +173,58 @@ const ExpenseDetailPage = () => {
                         <div className="detail-item">
                             <label>이용금액</label>
                             <span className="amount-value">
-                {currentExpense.amount
-                    ? currentExpense.amount.toLocaleString() + "원"
-                    : "-"}
-              </span>
+                                {currentExpense.amount ? currentExpense.amount.toLocaleString() + "원" : "-"}
+                            </span>
                         </div>
                         <div className="detail-item">
                             <label>사용용도</label>
                             <span>{currentExpense.category || "-"}</span>
                         </div>
-                        <div className="detail-item full-width">
+                        <div className="detail-item">
                             <label>상세내용</label>
                             <span>{currentExpense.description || "-"}</span>
                         </div>
                         <div className="detail-item">
                             <label>전자결재 상신일</label>
-                            <span>
-                {currentExpense.createdAt
-                    ? currentExpense.createdAt.split("T")[0]
-                    : "-"}
-              </span>
+                            <span>{currentExpense.createdAt ? currentExpense.createdAt.split("T")[0] : "-"}</span>
                         </div>
-                        {currentExpense.status === "APPROVED" && (
-                            <div className="detail-item">
-                                <label>전자결재 승인일</label>
-                                <span>
-                  {currentExpense.updatedAt
-                      ? currentExpense.updatedAt.split("T")[0]
-                      : "-"}
-                </span>
+                        <div className="detail-item">
+                            <label>전자결재 승인일</label>
+                            <span>
+                                {currentExpense.status === "APPROVED" && currentExpense.updatedAt
+                                    ? currentExpense.updatedAt.split("T")[0]
+                                    : "-"}
+                            </span>
+                        </div>
+                        {currentExpense.description && (
+                            <div className="detail-item full-width">
+                                <label>메모</label>
+                                <span>{currentExpense.description}</span>
                             </div>
-                        )}
-                        {currentExpense.status === "REJECTED" && (
-                            <>
-                                <div className="detail-item">
-                                    <label>전자결재 반려일</label>
-                                    <span>
-                    {loadingLogs ? (
-                        <span className="loading-skeleton">로딩 중...</span>
-                    ) : (
-                        (() => {
-                            const rejectLog = approvalLogs.find(
-                                (log) =>
-                                    log.action === "REJECT" || log.action === "reject"
-                            );
-                            if (rejectLog?.createdAt) {
-                                return rejectLog.createdAt.split("T")[0];
-                            }
-                            if (currentExpense.updatedAt) {
-                                return currentExpense.updatedAt.split("T")[0];
-                            }
-                            return "-";
-                        })()
-                    )}
-                  </span>
-                                </div>
-                                <div className="detail-item full-width">
-                                    <label>반려 사유</label>
-                                    <div className="reject-reason-box">
-                                        {loadingLogs ? (
-                                            <span className="loading-skeleton">로딩 중...</span>
-                                        ) : (
-                                            (() => {
-                                                const rejectLog = approvalLogs.find(
-                                                    (log) =>
-                                                        log.action === "REJECT" || log.action === "reject"
-                                                );
-                                                return rejectLog?.message || "-";
-                                            })()
-                                        )}
-                                    </div>
-                                </div>
-                            </>
                         )}
                     </div>
                 </div>
 
-                {/* DRAFT 상태: 영수증이 있으면 보기 버튼만 표시 */}
-                {currentExpense.status === "DRAFT" && currentExpense.hasReceipt && (
+                {currentExpense.status === "DRAFT" && (
                     <div className="card">
-                        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                            <button
-                                className="btn btn-primary"
-                                onClick={() =>
-                                    navigate(`/receipt/receipts/${currentExpense.receiptId}`)
-                                }
-                            >
-                                영수증 보기
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* DRAFT가 아닌 상태 (상신/반려 등): 영수증이 있으면 보기 버튼만 표시 */}
-                {currentExpense.status !== "DRAFT" && currentExpense.hasReceipt && (
-                    <div className="card">
-                        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                            <button
-                                className="btn btn-primary"
-                                onClick={() =>
-                                    navigate(`/receipt/receipts/${currentExpense.receiptId}`)
-                                }
-                            >
-                                영수증 보기
-                            </button>
-                        </div>
+                        <h2 className="card-title">영수증 업로드</h2>
+                        {currentExpense.hasReceipt ? (
+                            <div>
+                                <p>영수증이 업로드되어 있습니다.</p>
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={() => navigate(`/receipt/receipts/${currentExpense.receiptId}`)}
+                                >
+                                    영수증 보기
+                                </button>
+                            </div>
+                        ) : (
+                            <ReceiptUpload
+                                expenseId={currentExpense.id}
+                                onUploadSuccess={handleUploadSuccess}
+                                onUploadError={(error) => alert(error)}
+                            />
+                        )}
                     </div>
                 )}
             </div>

@@ -6,20 +6,13 @@ import ExpenseList from "../../components/finance/ExpenseList";
 import "./FinanceListPage.css";
 import AppLayout from "../../components/layout/AppLayout";
 
-/**
- * 지출 내역 목록 페이지 컴포넌트
- *
- * 사용자의 지출 내역을 조회하고 필터링할 수 있는 페이지입니다.
- * Redux를 통해 상태를 관리하며, URL 쿼리 파라미터와 동기화됩니다.
- *
- * @component
- */
 const FinanceListPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const {expenses, pageResponse, loading} = useSelector((state) => state.expense);
 
+    // URL 쿼리 파라미터에서 초기값 읽기 (mall 패턴)
     const [currentPage, setCurrentPage] = useState(() => {
         const page = parseInt(searchParams.get("page") || "1", 10);
         return isNaN(page) || page < 1 ? 1 : page;
@@ -27,8 +20,9 @@ const FinanceListPage = () => {
     const [statusFilter, setStatusFilter] = useState(() => searchParams.get("status") || "");
     const [startDate, setStartDate] = useState(() => searchParams.get("startDate") || "");
     const [endDate, setEndDate] = useState(() => searchParams.get("endDate") || "");
-    const [expenseType, setExpenseType] = useState("corporate");
+    const [expenseType, setExpenseType] = useState("corporate"); // corporate, personal, fuel
 
+    // URL 쿼리 파라미터 동기화
     useEffect(() => {
         const params = new URLSearchParams();
         if (currentPage > 1) params.set("page", currentPage.toString());
@@ -43,6 +37,7 @@ const FinanceListPage = () => {
         }
     }, [currentPage, statusFilter, startDate, endDate, setSearchParams]);
 
+    // 필터 변경 시 첫 페이지로 리셋 (URL 동기화와 분리)
     const prevFilters = useRef({statusFilter, startDate, endDate});
     useEffect(() => {
         const prev = prevFilters.current;
@@ -69,28 +64,8 @@ const FinanceListPage = () => {
         );
     }, [dispatch, currentPage, statusFilter, startDate, endDate]);
 
-    useEffect(() => {
-        const handleFocus = () => {
-            dispatch(
-                fetchExpenses({
-                    page: currentPage,
-                    size: 15,
-                    status: statusFilter || undefined,
-                    startDate: startDate || undefined,
-                    endDate: endDate || undefined,
-                })
-            );
-        };
-        window.addEventListener("focus", handleFocus);
-        return () => window.removeEventListener("focus", handleFocus);
-    }, [dispatch, currentPage, statusFilter, startDate, endDate]);
-
-    /**
-     * 지출 내역 클릭 핸들러
-     *
-     * @param {Object} expense - 클릭된 지출 내역 객체
-     */
     const handleExpenseClick = (expense) => {
+        // URL 쿼리 파라미터를 포함하여 상세 페이지로 이동 (mall 패턴)
         const params = createSearchParams({
             page: currentPage.toString(),
             ...(statusFilter && {status: statusFilter}),
@@ -100,11 +75,6 @@ const FinanceListPage = () => {
         navigate(`/receipt/expenses/${expense.id}?${params.toString()}`);
     };
 
-    /**
-     * 페이지 변경 핸들러
-     *
-     * @param {number} page - 이동할 페이지 번호
-     */
     const handlePageChange = (page) => {
         setCurrentPage(page);
     };
@@ -129,6 +99,7 @@ const FinanceListPage = () => {
                     </p>
                 </div>
 
+                {/* Expense Type Tabs */}
                 <div className="expense-type-tabs">
                     <button
                         className={`tab-btn ${expenseType === "corporate" ? "active" : ""}`}
@@ -150,6 +121,7 @@ const FinanceListPage = () => {
                     </button>
                 </div>
 
+                {/* Filter Section */}
                 <div className="filter-section">
                     <div className="filter-row">
                         <div className="filter-item">
@@ -187,6 +159,7 @@ const FinanceListPage = () => {
                     </div>
                 </div>
 
+                {/* Table Section */}
                 <div className="table-container">
                     <ExpenseList
                         expenses={expenses}

@@ -55,15 +55,10 @@ public class UserProfileImageServiceImpl implements UserProfileImageService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
 
-        // 3. 기존 이미지가 있으면 삭제 (트랜잭션 내에서 즉시 반영)
-        profileImageRepository.findByUserId(userId).ifPresent(existingImage -> {
-            // 파일 삭제
-            deleteFile(existingImage.getFileName());
-            // DB 삭제
-            profileImageRepository.delete(existingImage);
-            profileImageRepository.flush(); // ✅ 즉시 DB에 반영하여 UNIQUE 제약 조건 해제
-            log.info("기존 프로필 이미지 삭제 완료 - fileName: {}", existingImage.getFileName());
-        });
+        // 3. 기존 이미지가 있으면 삭제
+        if (profileImageRepository.existsByUserId(userId)) {
+            deleteProfileImage(userId);
+        }
 
         // 4. 파일 저장
         String savedFileName = saveFile(file);

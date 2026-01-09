@@ -84,10 +84,8 @@ export default function ChatPanel({ roomId }) {
             const data = await chatApi.getMessages(rid, { limit: 30 });
             const list = Array.isArray(data) ? data : [];
 
-            // ✅ attachments 포함 그대로 유지 (서버가 내려주면 그대로 담김)
             setMessages(list);
 
-            // ✅ seenIds 갱신
             const next = new Set();
             for (const m of list) next.add(String(m.messageId ?? m.id));
             seenIdsRef.current = next;
@@ -108,57 +106,42 @@ export default function ChatPanel({ roomId }) {
         }
     }, []);
 
-    // ✅ 메시지 요약 텍스트 만들기 (첨부-only면 📎 파일)
-    const summarizeIncoming = useCallback((incoming) => {
-        const text = (incoming?.content ?? "").trim();
-        if (text) return text;
+    // ✅ 핵심: 메시지 들어오면 rooms를 로컬에서 즉시 갱신 + 맨 위로 올림
+    const bumpRoomByIncoming = useCallback((incoming) => {
+        const rid = String(incoming.roomId);
+        const createdAt = incoming.createdAt ?? new Date().toISOString();
+        const lastContent = (incoming.content ?? "…").trim();
 
-        const hasAtt = Array.isArray(incoming?.attachments) && incoming.attachments.length > 0;
-        if (hasAtt) {
-            if (incoming.attachments.length === 1) return "📎 파일 1개";
-            return `📎 파일 ${incoming.attachments.length}개`;
-        }
-        return "…";
-    }, []);
+        setRooms((prev) => {
+            const next = prev.map((r) => {
+                const rId = String(r.roomId ?? r.id);
+                if (rId !== rid) return r;
 
-    // ✅ rooms를 로컬에서 즉시 갱신 + 맨 위로 올림
-    const bumpRoomByIncoming = useCallback(
-        (incoming) => {
-            const rid = String(incoming.roomId);
-            const createdAt = incoming.createdAt ?? new Date().toISOString();
-            const lastContent = summarizeIncoming(incoming);
-
-            setRooms((prev) => {
-                const next = prev.map((r) => {
-                    const rId = String(r.roomId ?? r.id);
-                    if (rId !== rid) return r;
-
-                    return {
-                        ...r,
-                        lastContent,
-                        lastCreatedAt: createdAt, // ✅ 정렬 키
-                    };
-                });
-
-                next.sort((a, b) => {
-                    const atA =
-                        toMillis(a.lastCreatedAt) ||
-                        toMillis(a.lastMessageCreatedAt) ||
-                        toMillis(a.updatedAt);
-
-                    const atB =
-                        toMillis(b.lastCreatedAt) ||
-                        toMillis(b.lastMessageCreatedAt) ||
-                        toMillis(b.updatedAt);
-
-                    return atB - atA;
-                });
-
-                return next;
+                return {
+                    ...r,
+                    lastContent,
+                    lastCreatedAt: createdAt, // ✅ 정렬 키
+                };
             });
-        },
-        [summarizeIncoming]
-    );
+
+            // 해당 room이 목록에 없으면 그냥 그대로(원하면 여기서 추가도 가능)
+            next.sort((a, b) => {
+                const atA =
+                    toMillis(a.lastCreatedAt) ||
+                    toMillis(a.lastMessageCreatedAt) ||
+                    toMillis(a.updatedAt);
+
+                const atB =
+                    toMillis(b.lastCreatedAt) ||
+                    toMillis(b.lastMessageCreatedAt) ||
+                    toMillis(b.updatedAt);
+
+                return atB - atA;
+            });
+
+            return next;
+        });
+    }, []);
 
     // 1) 최초 rooms 로딩
     useEffect(() => {
@@ -178,6 +161,7 @@ export default function ChatPanel({ roomId }) {
 
         connectChatSocket(jwt);
 
+        // rooms 이벤트는 나중에 서버가 보내면 받는 용도(있으면 쓰고 없으면 상관없음)
         subscribeRooms((evt) => {
             console.log("📩 rooms evt", evt);
             if (evt?.type === "ROOMS_CHANGED") loadRooms();
@@ -192,7 +176,6 @@ export default function ChatPanel({ roomId }) {
     useEffect(() => {
         if (!selectedRoomId) return;
 
-        // ✅ 방 바뀌면 seen 초기화 (중복 방지 set)
         seenIdsRef.current = new Set();
 
         const prev = prevRoomIdRef.current;
@@ -200,18 +183,14 @@ export default function ChatPanel({ roomId }) {
             unsubscribeRoom(prev);
         }
         prevRoomIdRef.current = selectedRoomId;
+
         selectedRoomIdRef.current = selectedRoomId;
 
         loadMessagesOnce(selectedRoomId);
         loadRoomMeta(selectedRoomId);
 
         subscribeRoom(selectedRoomId, (incoming) => {
-            // ✅ 서버가 type을 같이 보낼 수도 있음
-            // MESSAGE 타입만 처리 (없으면 그냥 처리)
-            if (incoming?.type && incoming.type !== "MESSAGE") return;
-
             const msgId = String(incoming.messageId ?? incoming.id);
-            if (!msgId) return;
 
             if (seenIdsRef.current.has(msgId)) return;
             seenIdsRef.current.add(msgId);
@@ -220,15 +199,13 @@ export default function ChatPanel({ roomId }) {
                 messageId: incoming.messageId ?? incoming.id,
                 roomId: incoming.roomId ?? selectedRoomIdRef.current,
                 senderId: incoming.senderId,
-                content: incoming.content ?? "",
+                content: incoming.content,
                 createdAt: incoming.createdAt,
-                // ✅ 핵심: attachments 그대로 붙이기
-                attachments: Array.isArray(incoming.attachments) ? incoming.attachments : [],
             };
 
             setMessages((prevMsgs) => [...prevMsgs, msg]);
 
-            // ✅ 방 리스트 즉시 업데이트(첨부-only면 📎 파일)
+            // ✅ 여기서 “방 리스트”를 즉시 맨 위로 올림 (핵심)
             bumpRoomByIncoming(msg);
         });
 
@@ -251,7 +228,7 @@ export default function ChatPanel({ roomId }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [latestMessageId, selectedRoomId]);
 
-    // 6) 전송: WS publish (텍스트만)
+    // 6) 전송: WS publish
     const handleSend = useCallback(
         (text) => {
             if (!selectedRoomId) return;
@@ -262,6 +239,9 @@ export default function ChatPanel({ roomId }) {
                 setErr("소켓 연결이 끊겨서 전송 실패");
                 return;
             }
+
+            // ❌ 여기서 loadRooms()를 즉시 치면 “서버 반영 전”이라 안 올라갈 수 있음
+            // ✅ 대신 브로드캐스트 수신 시 bumpRoomByIncoming()로 즉시 올라가게 처리됨
         },
         [selectedRoomId]
     );
@@ -308,12 +288,7 @@ export default function ChatPanel({ roomId }) {
                 {err && <div className="chatErr">{err}</div>}
 
                 <MessageList messages={messages} otherLastReadMessageId={otherLastReadMessageId} />
-                <MessageInput
-                    disabled={!selectedRoomId}
-                    roomId={selectedRoomId}
-                    onSend={handleSend}
-                />
-
+                <MessageInput disabled={!selectedRoomId} onSend={handleSend} />
             </main>
         </div>
     );

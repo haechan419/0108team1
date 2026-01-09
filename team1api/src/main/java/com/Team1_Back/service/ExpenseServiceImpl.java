@@ -28,19 +28,19 @@ public class ExpenseServiceImpl implements ExpenseService {
     private final ExpenseRepository expenseRepository;
     private final UserRepository userRepository;
     private final ReceiptUploadRepository receiptUploadRepository;
-    private final ReceiptAiExtractionRepository receiptAiExtractionRepository;
-    private final ReceiptVerificationRepository receiptVerificationRepository;
     private final ApprovalRequestRepository approvalRequestRepository;
     private final ApprovalActionLogRepository approvalActionLogRepository;
     private final ModelMapper modelMapper;
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponseDTO<ExpenseDTO> getList(Long userId, PageRequestDTO pageRequestDTO, String status, LocalDate startDate, LocalDate endDate) {
+    public PageResponseDTO<ExpenseDTO> getList(Long userId, PageRequestDTO pageRequestDTO, String status,
+            LocalDate startDate, LocalDate endDate) {
         if (pageRequestDTO == null) {
             pageRequestDTO = PageRequestDTO.builder().page(1).size(15).build();
         }
 
+        // 상신일 기준 정렬 (최근 상신일 먼저), 같은 날짜면 최근 업데이트 먼저
         Pageable pageable = pageRequestDTO.getPageable("createdAt", "updatedAt");
 
         ApprovalStatus statusEnum = null;
@@ -49,41 +49,33 @@ public class ExpenseServiceImpl implements ExpenseService {
                 statusEnum = ApprovalStatus.valueOf(status);
             } catch (IllegalArgumentException e) {
                 log.warn("잘못된 status 값: " + status);
+                // 잘못된 status 값은 무시
             }
         }
 
         Page<Expense> result;
-        boolean hasStartDate = startDate != null;
-        boolean hasEndDate = endDate != null;
-
-        if (statusEnum != null && hasStartDate && hasEndDate) {
-            result = expenseRepository.findByUserIdAndStatusAndDateRange(userId, statusEnum, startDate, endDate, pageable);
-        } else if (statusEnum != null && hasStartDate) {
-            result = expenseRepository.findByUserIdAndStatusAndStartDate(userId, statusEnum, startDate, pageable);
-        } else if (statusEnum != null && hasEndDate) {
-            result = expenseRepository.findByUserIdAndStatusAndEndDate(userId, statusEnum, endDate, pageable);
+        if (statusEnum != null && startDate != null && endDate != null) {
+            result = expenseRepository.findByUserIdAndStatusAndDateRange(userId, statusEnum, startDate, endDate,
+                    pageable);
         } else if (statusEnum != null) {
             result = expenseRepository.findByWriterIdAndStatus(userId, statusEnum, pageable);
-        } else if (hasStartDate && hasEndDate) {
+        } else if (startDate != null && endDate != null) {
             result = expenseRepository.findByUserIdAndDateRange(userId, startDate, endDate, pageable);
-        } else if (hasStartDate) {
-            result = expenseRepository.findByUserIdAndStartDate(userId, startDate, pageable);
-        } else if (hasEndDate) {
-            result = expenseRepository.findByUserIdAndEndDate(userId, endDate, pageable);
         } else {
             result = expenseRepository.findByWriterId(userId, pageable);
         }
+
+        log.info("getList..............");
 
         List<ExpenseDTO> dtoList = result.getContent().stream()
                 .map(this::entityToDTO)
                 .filter(dto -> dto != null)
                 .collect(Collectors.toList());
 
-        return PageResponseDTO.of(
+        return PageResponseDTO.<ExpenseDTO>of(
                 dtoList,
                 pageRequestDTO,
-                result.getTotalElements()
-        );
+                result.getTotalElements());
     }
 
     @Override
@@ -134,51 +126,13 @@ public class ExpenseServiceImpl implements ExpenseService {
 
     @Override
     public void remove(Long id, Long userId) {
-        Optional<Expense> expenseOpt = expenseRepository.findByIdAndWriterId(id, userId);
-        Expense expense = expenseOpt.orElseThrow(() ->
-                new IllegalArgumentException("지출 내역을 찾을 수 없거나 권한이 없습니다."));
+        Optional<Expense> result = expenseRepository.findByIdAndWriterId(id, userId);
+        Expense expense = result.orElseThrow();
 
         if (!expense.canDelete()) {
             throw new IllegalStateException("삭제할 수 없는 상태입니다.");
         }
 
-        // 1. ReceiptUpload가 있으면 관련 데이터 먼저 삭제
-        Optional<ReceiptUpload> receiptOpt = receiptUploadRepository.findByExpenseId(id);
-        if (receiptOpt.isPresent()) {
-            ReceiptUpload receipt = receiptOpt.get();
-
-            // 1-1. ReceiptAiExtraction 삭제 (ReceiptUpload를 참조)
-            Optional<ReceiptAiExtraction> extractionOpt = receiptAiExtractionRepository.findByReceiptId(receipt.getId());
-            if (extractionOpt.isPresent()) {
-                receiptAiExtractionRepository.delete(extractionOpt.get());
-            }
-
-            // 1-2. ReceiptUpload 삭제
-            receiptUploadRepository.delete(receipt);
-        }
-
-        // 2. ReceiptVerification 삭제 (Expense를 직접 참조)
-        Optional<ReceiptVerification> verificationOpt = receiptVerificationRepository.findByExpenseId(id);
-        if (verificationOpt.isPresent()) {
-            receiptVerificationRepository.delete(verificationOpt.get());
-        }
-
-        // 3. ApprovalRequest 관련 데이터 삭제 (refId로 참조)
-        Optional<ApprovalRequest> approvalRequestOpt = approvalRequestRepository.findByRequestTypeAndRefId("EXPENSE", id);
-        if (approvalRequestOpt.isPresent()) {
-            ApprovalRequest approvalRequest = approvalRequestOpt.get();
-
-            // 3-1. ApprovalActionLog 먼저 삭제 (ApprovalRequest를 참조)
-            List<ApprovalActionLog> actionLogs = approvalActionLogRepository.findByApprovalRequestIdOrderByCreatedAtAsc(approvalRequest.getId());
-            if (!actionLogs.isEmpty()) {
-                approvalActionLogRepository.deleteAll(actionLogs);
-            }
-
-            // 3-2. ApprovalRequest 삭제
-            approvalRequestRepository.delete(approvalRequest);
-        }
-
-        // 4. Expense 삭제
         expenseRepository.delete(expense);
     }
 
@@ -220,7 +174,8 @@ public class ExpenseServiceImpl implements ExpenseService {
     }
 
     private Expense dtoToEntity(ExpenseDTO dto) {
-        if (dto == null) return null;
+        if (dto == null)
+            return null;
 
         return Expense.builder()
                 .id(dto.getId())
@@ -235,7 +190,8 @@ public class ExpenseServiceImpl implements ExpenseService {
     }
 
     private ExpenseDTO entityToDTO(Expense entity) {
-        if (entity == null) return null;
+        if (entity == null)
+            return null;
 
         User writer = entity.getWriter();
 
@@ -283,4 +239,3 @@ public class ExpenseServiceImpl implements ExpenseService {
                 .collect(Collectors.toMap(ExpenseDTO::getId, java.util.function.Function.identity()));
     }
 }
-

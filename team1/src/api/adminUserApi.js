@@ -46,12 +46,12 @@ export const uploadProfileImage = async (userId, file) => {
     const formData = new FormData();
     formData.append("file", file);
 
-  // ✅ FormData를 사용할 때는 Content-Type 헤더를 명시하지 않아야 합니다.
-  // axios가 자동으로 "multipart/form-data; boundary=..." 형식으로 설정합니다.
-  // 수동으로 설정하면 boundary 파라미터가 없어서 서버가 파싱하지 못하고,
-  // Authorization 헤더도 덮어씌워질 수 있습니다.
-  const res = await jwtAxios.post(`/admin/users/${userId}/profile-image`, formData);
-  return res.data;
+    const res = await jwtAxios.post(`/admin/users/${userId}/profile-image`, formData, {
+        headers: {
+            "Content-Type": "multipart/form-data",
+        },
+    });
+    return res.data;
 };
 
 // 프로필 이미지 조회

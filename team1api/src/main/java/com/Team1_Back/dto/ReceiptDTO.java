@@ -48,8 +48,6 @@ public class ReceiptDTO {
 
     private String extractedCategory;
 
-    private String extractedDescription;
-
     private BigDecimal confidence;
 
     private LocalDateTime extractionCreatedAt;
