@@ -237,7 +237,15 @@ export default function Sidebar() {
                             }`}
                             onClick={() => navigate("/admin/hr")}
                         >
-                            <span style={{marginRight: "10px"}}>👥</span> 사원관리
+                            <span style={{ marginRight: "10px" }}>👥</span> 사원관리
+                        </div>
+                        <div
+                            className={`nav-item ${
+                                location.pathname === "/admin/attendance" ? "active" : ""
+                            }`}
+                            onClick={() => navigate("/admin/attendance")}
+                        >
+                            <span style={{ marginRight: "10px" }}>📅</span> 출결관리
                         </div>
 
                         <div

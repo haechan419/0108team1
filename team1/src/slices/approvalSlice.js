@@ -48,7 +48,7 @@ const approvalSlice = createSlice({
       })
       .addCase(fetchApprovalRequests.fulfilled, (state, action) => {
         state.loading = false;
-        state.requests = action.payload.dtoList;
+        state.requests = action.payload.content;
         state.pageResponse = action.payload;
       })
       .addCase(fetchApprovalRequests.rejected, (state, action) => {

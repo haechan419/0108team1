@@ -84,11 +84,11 @@ public class NoticeServiceImpl implements NoticeService {
                 .stream()
                 .map(notice -> modelMapper.map(notice, NoticeDTO.class))
                 .collect(Collectors.toList());
-        return PageResponseDTO.<NoticeDTO>withAll()
-                .dtoList(dtoList)
-                .pageRequestDTO(pageRequestDTO)
-                .totalCount(savedNotice.getTotalElements())
-                .build();
+        return PageResponseDTO.of(
+                dtoList,
+                pageRequestDTO,
+                savedNotice.getTotalElements()
+        );
     }
 
     @Override

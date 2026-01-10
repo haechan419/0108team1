@@ -302,6 +302,37 @@ body {
   color: #0f172a;
 }
 
+.chatRoomsPopover{
+    position: absolute;
+    top: 42px;
+    right: 0;
+    width: 240px;
+    background: #fff;
+    border: 1px solid rgba(17, 24, 39, 0.12);
+    border-radius: 12px;
+    box-shadow: 0 10px 24px rgba(17, 24, 39, 0.12);
+    padding: 8px;
+    z-index: 9999;
+}
+
+.chatRoomItem{
+    width: 100%;
+    text-align: left;
+    padding: 10px 12px;
+    border: 0;
+    background: transparent;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.chatRoomItem:hover{ background: rgba(17, 24, 39, 0.06); }
+
+.chatRoomsEmpty{
+    padding: 10px 12px;
+    color: rgba(17, 24, 39, 0.6);
+}
+
+
 /* 반응형 (화면 작아지면 세로로) */
 @media (max-width: 1200px) {
   .dashboard-grid {

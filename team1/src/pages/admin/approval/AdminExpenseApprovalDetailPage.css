@@ -111,8 +111,8 @@
 }
 
 .status-submitted {
-  background-color: #dbeafe;
-  color: #1e40af;
+  background-color: transparent;
+  color: inherit;
 }
 
 .status-approved {
@@ -123,11 +123,6 @@
 .status-rejected {
   background-color: #fee2e2;
   color: #991b1b;
-}
-
-.status-request-more-info {
-  background-color: #fef3c7;
-  color: #92400e;
 }
 
 .receipt-image-container {
@@ -606,4 +601,3 @@
     grid-template-columns: 1fr;
   }
 }
-

@@ -96,10 +96,10 @@ export default function RequestHistoryPage() {
               {status === "ALL"
                 ? "전체 보기"
                 : status === "PENDING"
-                ? "승인 대기"
-                : status === "APPROVED"
-                ? "승인 완료"
-                : "반려됨"}
+                  ? "승인 대기"
+                  : status === "APPROVED"
+                    ? "승인 완료"
+                    : "반려됨"}
             </button>
           ))}
         </div>
@@ -133,9 +133,8 @@ export default function RequestHistoryPage() {
               return (
                 <div
                   key={reqId}
-                  className={`history-card-pro ${
-                    expandedId === reqId ? "expanded" : ""
-                  }`}
+                  className={`history-card-pro ${expandedId === reqId ? "expanded" : ""
+                    }`}
                   // ✨ [핵심 수정] 카드 전체에 색상 입히기
                   style={{
                     borderLeft: `6px solid ${theme.border}`,
@@ -175,8 +174,8 @@ export default function RequestHistoryPage() {
                         {reqStatus === "PENDING"
                           ? "결재 대기"
                           : reqStatus === "APPROVED"
-                          ? "승인됨"
-                          : "반려됨"}
+                            ? "승인됨"
+                            : "반려됨"}
                       </div>
                       <div className="arrow-icon">
                         {expandedId === reqId ? "▲" : "▼"}
@@ -194,31 +193,28 @@ export default function RequestHistoryPage() {
                         <div className={`step completed`}>기안 상신</div>
                         <div className="line completed"></div>
                         <div
-                          className={`step ${
-                            reqStatus !== "PENDING" ? "completed" : "active"
-                          }`}
+                          className={`step ${reqStatus !== "PENDING" ? "completed" : "active"
+                            }`}
                         >
                           담당자 확인
                         </div>
                         <div
-                          className={`line ${
-                            reqStatus !== "PENDING" ? "completed" : ""
-                          }`}
+                          className={`line ${reqStatus !== "PENDING" ? "completed" : ""
+                            }`}
                         ></div>
                         <div
-                          className={`step ${
-                            reqStatus === "APPROVED"
+                          className={`step ${reqStatus === "APPROVED"
                               ? "completed"
                               : reqStatus === "REJECTED"
-                              ? "error"
-                              : ""
-                          }`}
+                                ? "error"
+                                : ""
+                            }`}
                         >
                           {reqStatus === "APPROVED"
                             ? "최종 승인"
                             : reqStatus === "REJECTED"
-                            ? "반려됨"
-                            : "승인 대기"}
+                              ? "반려됨"
+                              : "승인 대기"}
                         </div>
                       </div>
 

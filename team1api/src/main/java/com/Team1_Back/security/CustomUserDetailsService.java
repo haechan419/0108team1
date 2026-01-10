@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import com.Team1_Back.domain.User;
 import com.Team1_Back.dto.UserDTO;
+import com.Team1_Back.repository.UserProfileImageRepository;
 import com.Team1_Back.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
+    private final UserProfileImageRepository profileImageRepository;
 
     @Override
     public UserDetails loadUserByUsername(String employeeNo) throws UsernameNotFoundException {
@@ -34,6 +36,11 @@ public class CustomUserDetailsService implements UserDetailsService {
             throw new UsernameNotFoundException("존재하지 않는 사번입니다: " + employeeNo);
         }
 
+        // 프로필 이미지 URL 조회
+        String profileImageUrl = profileImageRepository.findFileNameByUserId(user.getId())
+                .map(fileName -> "/api/view/user_image/s_" + fileName)  // 썸네일 URL
+                .orElse(null);
+
         UserDTO userDTO = new UserDTO(
                 user.getId(),
                 user.getEmployeeNo(),
@@ -44,7 +51,8 @@ public class CustomUserDetailsService implements UserDetailsService {
                 user.getIsActive(),
                 user.isLocked(),
                 user.getFailedLoginCount(),
-                List.of(user.getRole().name())
+                List.of(user.getRole().name()),
+                profileImageUrl  // 프로필 이미지 URL 전달
         );
 
         log.info("UserDTO: {}", userDTO);

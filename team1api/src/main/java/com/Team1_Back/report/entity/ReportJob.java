@@ -85,6 +85,15 @@ public class ReportJob {
         this.updatedAt = this.createdAt;
     }
 
+
+    @Column(name="approved_total")
+    private Long approvedTotal;
+
+
+    @Column(name="approved_count")
+    private Integer approvedCount;
+
+
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

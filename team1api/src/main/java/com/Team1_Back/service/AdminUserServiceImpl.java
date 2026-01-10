@@ -3,6 +3,7 @@ package com.Team1_Back.service;
 import com.Team1_Back.domain.Role;
 import com.Team1_Back.domain.User;
 import com.Team1_Back.dto.*;
+import com.Team1_Back.repository.UserProfileImageRepository;
 import com.Team1_Back.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -21,6 +22,7 @@ import java.util.List;
 public class AdminUserServiceImpl implements AdminUserService {
 
     private final UserRepository userRepository;
+    private final UserProfileImageRepository profileImageRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -35,16 +37,36 @@ public class AdminUserServiceImpl implements AdminUserService {
         Page<UserListDTO> result = userRepository.searchUsers(request, pageable);
         List<String> departments = userRepository.findAllDepartments();
 
-        return PageResponseDTO.<UserListDTO>builder()
-                .content(result.getContent())
-                .page(request.getPage())
-                .size(request.getSize())
-                .totalElements(result.getTotalElements())
-                .totalPage(result.getTotalPages())
-                .next(result.hasNext())
-                .prev(result.hasPrevious())
-                .departments(departments)
-                .build();
+//        return PageResponseDTO.<UserListDTO>builder()
+//                .content(result.getContent())
+//                .page(request.getPage())
+//                .size(request.getSize())
+//                .totalElements(result.getTotalElements())
+//                .totalPage(result.getTotalPages())
+//                .next(result.hasNext())
+//                .prev(result.hasPrevious())
+//                .departments(departments)
+//                .build();
+        PageResponseDTO<UserListDTO> response =
+                PageResponseDTO.from(
+                        result.map(user -> UserListDTO.builder()
+                                .id(user.getId())
+                                .employeeNo(user.getEmployeeNo())
+                                .name(user.getName())
+                                .departmentName(user.getDepartmentName())
+                                .email(user.getEmail())
+                                .phone(user.getPhone())
+                                .createdUserAt(user.getCreatedUserAt())
+                                .locked(user.isLocked())
+                                .active(user.isActive())
+                                .thumbnailUrl(user.getThumbnailUrl())
+                                .build())
+                );
+
+        response.setDepartments(departments);
+        return response;
+
+
     }
 
     @Override
@@ -52,6 +74,19 @@ public class AdminUserServiceImpl implements AdminUserService {
 
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("사원을 찾을 수 없습니다: " + id));
+
+        // 프로필 이미지 URL 조회
+        String profileImageUrl = null;
+        String thumbnailUrl = null;
+        
+        profileImageRepository.findFileNameByUserId(id).ifPresent(fileName -> {
+        });
+        
+        String fileName = profileImageRepository.findFileNameByUserId(id).orElse(null);
+        if (fileName != null) {
+            profileImageUrl = "/api/view/user_image/" + fileName;
+            thumbnailUrl = "/api/view/user_image/s_" + fileName;
+        }
 
         return UserDetailsDTO.builder()
                 .id(user.getId())
@@ -68,6 +103,8 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .isActive(user.getIsActive())
                 .createdUserAt(user.getCreatedUserAt())
                 .updatedUserAt(user.getUpdatedUserAt())
+                .profileImageUrl(profileImageUrl)
+                .thumbnailUrl(thumbnailUrl)
                 .build();
     }
 

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getUser } from "../../../api/adminUserApi";
 import AppLayout from "../../../components/layout/AppLayout";
+import ProfileImageUpload from "../../../components/admin/hr/ProfileImageUpload";
 import "./UserDetailPage.css";
 
 const UserDetailPage = () => {
@@ -74,11 +75,11 @@ const UserDetailPage = () => {
         <div className="top-section">
           {/* 왼쪽: 사진 업로드 영역 */}
           <div className="photo-section">
-            <h3 className="section-title">사진업로드(증명사진)</h3>
-            <div className="photo-placeholder">
-              <span>사진 없음</span>
-            </div>
-            <button className="btn btn-outline">파일 업로드</button>
+            <ProfileImageUpload 
+              userId={parseInt(id)}
+              thumbnailUrl={user.thumbnailUrl}
+              readOnly={true}
+            />
           </div>
 
           {/* 오른쪽: 직원 정보 */}
