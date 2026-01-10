@@ -39,7 +39,6 @@ import AdminShopPage from "./pages/admin/shop/AdminShopPage";
 import AdminApprovalPage from "./pages/admin/AdminApprovalPage";
 import ForbiddenPage from "./pages/ForbiddenPage";
 import AdminLayout from "./components/layout/AdminLayout";
-import AttendanceManagePage from "./pages/admin/hr/AttendanceManagePage";
 
 // (기존 FloatingUI는 지금 안 쓰면 import 제거해도 됨)
 // import FloatingUI from "./components/common/FloatingUI";
@@ -102,8 +101,6 @@ function AppInner() {
                     {/* 통합 결재 관리 */}
                     <Route path="approval" element={<AdminExpenseApprovalPage/>}/>
                     <Route path="approval/:id" element={<AdminExpenseApprovalDetailPage/>}/>
-
-                    <Route path="attendance" element={<AttendanceManagePage />} />
 
                     {/* 비품 재고 / 상품 관리 */}
                     <Route path="shop" element={<AdminShopPage title="[관리자] 상품/재고 관리"/>}/>

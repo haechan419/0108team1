@@ -12,15 +12,12 @@ const ExpenseList = ({
   const navigate = useNavigate();
 
   const getStatusLabel = (status) => {
-    // REQUEST_MORE_INFO 상태는 표시하지 않음
-    if (status === "REQUEST_MORE_INFO") {
-      return "";
-    }
     const statusMap = {
       DRAFT: "임시저장",
       SUBMITTED: "상신",
-      APPROVED: "승인",
+      APPROVED: "결재완료",
       REJECTED: "반려",
+      REQUEST_MORE_INFO: "보완요청",
     };
     return statusMap[status || ""] || status;
   };
@@ -31,6 +28,7 @@ const ExpenseList = ({
       SUBMITTED: "status-submitted",
       APPROVED: "status-approved",
       REJECTED: "status-rejected",
+      REQUEST_MORE_INFO: "status-request-more-info",
     };
     return classMap[status || ""] || "";
   };
@@ -50,10 +48,7 @@ const ExpenseList = ({
   }
 
   // expenses가 undefined이거나 배열이 아닌 경우 빈 배열로 처리
-  // REQUEST_MORE_INFO 상태는 프론트엔드에서 필터링하여 표시하지 않음
-  const expensesList = Array.isArray(expenses) 
-    ? expenses.filter((expense) => expense.status !== "REQUEST_MORE_INFO")
-    : [];
+  const expensesList = Array.isArray(expenses) ? expenses : [];
 
   if (expensesList.length === 0) {
     return (

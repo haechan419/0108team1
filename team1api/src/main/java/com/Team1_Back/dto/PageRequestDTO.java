@@ -1,14 +1,15 @@
 package com.Team1_Back.dto;
 
-import lombok.*;
-import lombok.experimental.SuperBuilder;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
-@Getter
-@Setter
-@SuperBuilder
+@Builder
+@Data
 @AllArgsConstructor
 @NoArgsConstructor
 public class PageRequestDTO {
@@ -19,21 +20,26 @@ public class PageRequestDTO {
     @Builder.Default
     private int size = 10;
 
-    private String category;
+    private String type; // 검색 타입
+
+    private String keyword; // 검색 키워드
+
     private String searchType;
-    private String keyword;
+
     private String department;
+
+    private String category;
+
     private Boolean isLocked;
+
     private Boolean isActive;
 
     public Pageable getPageable(String... props) {
-        if (props == null || props.length == 0) {
-            return PageRequest.of(page - 1, size);
-        }
-        return PageRequest.of(page - 1, size, Sort.by(props).descending());
+        return PageRequest.of(this.page - 1, this.size, Sort.by(props).descending());
     }
 
-    public int getOffset() {
-        return (page - 1) * size;
+    public Pageable getPageable(Sort sort) {
+        return PageRequest.of(this.page - 1, this.size, sort);
     }
 }
+

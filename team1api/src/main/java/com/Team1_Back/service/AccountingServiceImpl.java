@@ -32,21 +32,21 @@ public class AccountingServiceImpl implements AccountingService {
     @Override
     public List<DepartmentStatisticsDTO> getDepartmentStatistics(String status) {
         // status가 null이면 APPROVED로 기본값 설정
-        String statusValue = (status != null && !status.isEmpty())
-                ? status
-                : ApprovalStatus.APPROVED.name();
+        String statusValue = (status != null && !status.isEmpty()) 
+            ? status 
+            : ApprovalStatus.APPROVED.name();
 
         log.info("🔍 부서별 통계 조회 - status: {}", statusValue);
 
         List<Object[]> results = expenseRepository.findDepartmentStatistics(statusValue);
 
         List<DepartmentStatisticsDTO> dtoList = results.stream()
-                .map(row -> DepartmentStatisticsDTO.builder()
-                        .departmentName((String) row[0])
-                        .expenseCount(((Number) row[1]).longValue())
-                        .totalAmount(((Number) row[2]).longValue())
-                        .build())
-                .collect(Collectors.toList());
+            .map(row -> DepartmentStatisticsDTO.builder()
+                .departmentName((String) row[0])
+                .expenseCount(((Number) row[1]).longValue())
+                .totalAmount(((Number) row[2]).longValue())
+                .build())
+            .collect(Collectors.toList());
 
         log.info("✅ 부서별 통계 조회 결과 - 총 {}개 부서", dtoList.size());
         if (dtoList.isEmpty()) {
@@ -66,22 +66,22 @@ public class AccountingServiceImpl implements AccountingService {
     @Override
     // 카테고리별 통계 조회
     public List<Map<String, Object>> getCategoryStatistics(String status) {
-        String statusValue = (status != null && !status.isEmpty())
-                ? status
-                : ApprovalStatus.APPROVED.name();
+        String statusValue = (status != null && !status.isEmpty()) 
+            ? status 
+            : ApprovalStatus.APPROVED.name();
 
         log.info("🔍 카테고리별 통계 조회 - status: {}", statusValue);
 
         List<Object[]> results = expenseRepository.findCategoryStatistics(statusValue);
 
         List<Map<String, Object>> dtoList = results.stream()
-                .map(row -> {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("name", row[0] != null ? (String) row[0] : "기타");
-                    map.put("amount", ((Number) row[2]).longValue());
-                    return map;
-                })
-                .collect(Collectors.toList());
+            .map(row -> {
+                Map<String, Object> map = new HashMap<>();
+                map.put("name", row[0] != null ? (String) row[0] : "기타");
+                map.put("amount", ((Number) row[2]).longValue());
+                return map;
+            })
+            .collect(Collectors.toList());
 
         log.info("✅ 카테고리별 통계 조회 결과 - 총 {}개 카테고리", dtoList.size());
         if (dtoList.isEmpty()) {
@@ -101,10 +101,10 @@ public class AccountingServiceImpl implements AccountingService {
 
         // Phase 1: 오늘의 신규 결재 건수 (당일 상신된 모든 건수)
         Long todaySubmittedCount = approvalRequestRepository.countTodaySubmitted();
-
+        
         // Phase 1: 오늘의 처리 건수 (당일 승인/반려된 건수)
         Long todayProcessedCount = approvalRequestRepository.countTodayProcessed();
-
+        
         // Phase 1: 오늘의 결재 현황 (당일 처리된 건수만)
         Long todayApprovedCount = approvalRequestRepository.countTodayApproved();
         Long todayRejectedCount = approvalRequestRepository.countTodayRejected();
@@ -113,17 +113,17 @@ public class AccountingServiceImpl implements AccountingService {
         // 현재 월의 yearMonth 형식 (YYYY-MM)
         String currentYearMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
         List<Object[]> overBudgetUsers = userBudgetMonthlyRepository.findOverBudgetUsers(currentYearMonth);
-
+        
         // Phase 1: 전월 대비 증감률 계산
         LocalDate now = LocalDate.now();
         LocalDate lastMonth = now.minusMonths(1);
         String lastMonthYearMonth = lastMonth.format(DateTimeFormatter.ofPattern("yyyy-MM"));
-
+        
         // 전월 총 지출액 조회
         Long lastMonthTotalExpense = expenseRepository.sumMonthlyTotalExpenseByYearMonth(
-                lastMonthYearMonth, ApprovalStatus.APPROVED.name());
+            lastMonthYearMonth, ApprovalStatus.APPROVED.name());
         lastMonthTotalExpense = lastMonthTotalExpense != null ? lastMonthTotalExpense : 0L;
-
+        
         // 전월 대비 증감률 계산
         double monthlyExpenseChangeRate = 0.0;
         if (lastMonthTotalExpense > 0) {
@@ -139,21 +139,21 @@ public class AccountingServiceImpl implements AccountingService {
         try {
             // 현재 월의 전체 예산 합계 (더 효율적인 방법)
             Long totalBudget = userBudgetMonthlyRepository.findAll().stream()
-                    .filter(ubm -> currentYearMonth.equals(ubm.getYearMonth()))
-                    .mapToLong(ubm -> ubm.getMonthlyLimit())
-                    .sum();
-
+                .filter(ubm -> currentYearMonth.equals(ubm.getYearMonth()))
+                .mapToLong(ubm -> ubm.getMonthlyLimit())
+                .sum();
+            
             // 현재 월의 전체 지출 합계 (APPROVED 상태만)
             Long totalExpense = monthlyTotalExpense != null ? monthlyTotalExpense : 0L;
-
+            
             if (totalBudget > 0 && totalBudget > 0) {
                 totalBudgetExecutionRate = (totalExpense.doubleValue() / totalBudget.doubleValue()) * 100.0;
             } else if (totalBudget == 0) {
                 log.warn("⚠️ 현재 월({})의 예산 데이터가 없습니다.", currentYearMonth);
             }
-
-            log.info("📊 예산 집행률 계산 - 총 예산: {}, 총 지출: {}, 집행률: {}%",
-                    totalBudget, totalExpense, String.format("%.2f", totalBudgetExecutionRate));
+            
+            log.info("📊 예산 집행률 계산 - 총 예산: {}, 총 지출: {}, 집행률: {}%", 
+                totalBudget, totalExpense, String.format("%.2f", totalBudgetExecutionRate));
         } catch (Exception e) {
             log.warn("⚠️ 예산 집행률 계산 실패: {}", e.getMessage(), e);
             totalBudgetExecutionRate = 0.0;
@@ -164,26 +164,26 @@ public class AccountingServiceImpl implements AccountingService {
         summary.put("totalPendingCount", totalPendingCount != null ? totalPendingCount : 0L);
         summary.put("monthlyTotalExpense", monthlyTotalExpense != null ? monthlyTotalExpense : 0L);
         summary.put("overBudgetCount", overBudgetUsers.size());
-
+        
         // Phase 1: 추가 지표
         summary.put("todaySubmittedCount", todaySubmittedCount != null ? todaySubmittedCount : 0L);
         summary.put("todayProcessedCount", todayProcessedCount != null ? todayProcessedCount : 0L);
         summary.put("monthlyExpenseChangeRate", Math.round(monthlyExpenseChangeRate * 100.0) / 100.0);
-
+        
         // Phase 1: 오늘의 결재 현황 (당일 처리된 건수만)
         summary.put("todayApprovedCount", todayApprovedCount != null ? todayApprovedCount : 0L);
         summary.put("todayRejectedCount", todayRejectedCount != null ? todayRejectedCount : 0L);
         summary.put("todayRequestMoreInfoCount", todayRequestMoreInfoCount != null ? todayRequestMoreInfoCount : 0L);
 
         log.info("✅ 전체 통계 요약 조회 결과 - 집행률: {}%, 총 미결재: {}건, 월간 지출: {}원, 예산 초과: {}명, " +
-                "오늘 상신: {}건, 오늘 처리: {}건, 전월 대비: {}%",
-                String.format("%.2f", totalBudgetExecutionRate),
-                summary.get("totalPendingCount"),
-                summary.get("monthlyTotalExpense"),
-                summary.get("overBudgetCount"),
-                summary.get("todaySubmittedCount"),
-                summary.get("todayProcessedCount"),
-                String.format("%.2f", monthlyExpenseChangeRate));
+            "오늘 상신: {}건, 오늘 처리: {}건, 전월 대비: {}%", 
+            String.format("%.2f", totalBudgetExecutionRate), 
+            summary.get("totalPendingCount"),
+            summary.get("monthlyTotalExpense"),
+            summary.get("overBudgetCount"),
+            summary.get("todaySubmittedCount"),
+            summary.get("todayProcessedCount"),
+            String.format("%.2f", monthlyExpenseChangeRate));
         return summary;
     }
 
@@ -196,24 +196,24 @@ public class AccountingServiceImpl implements AccountingService {
         List<Object[]> results = userBudgetMonthlyRepository.findOverBudgetUsers(currentYearMonth);
 
         List<Map<String, Object>> dtoList = results.stream()
-                .map(row -> {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("name", row[1] != null ? (String) row[1] : "");
-                    map.put("department", row[2] != null ? (String) row[2] : "");
-
-                    Long monthlyLimit = ((Number) row[3]).longValue();
-                    Long totalExpense = ((Number) row[4]).longValue();
-                    Long remaining = ((Number) row[5]).longValue();
-
-                    double executionRate = monthlyLimit > 0
-                            ? (totalExpense.doubleValue() / monthlyLimit.doubleValue() * 100)
-                            : 0.0;
-
-                    map.put("executionRate", Math.round(executionRate));
-                    map.put("remaining", remaining);
-                    return map;
-                })
-                .collect(Collectors.toList());
+            .map(row -> {
+                Map<String, Object> map = new HashMap<>();
+                map.put("name", row[1] != null ? (String) row[1] : "");
+                map.put("department", row[2] != null ? (String) row[2] : "");
+                
+                Long monthlyLimit = ((Number) row[3]).longValue();
+                Long totalExpense = ((Number) row[4]).longValue();
+                Long remaining = ((Number) row[5]).longValue();
+                
+                double executionRate = monthlyLimit > 0 
+                    ? (totalExpense.doubleValue() / monthlyLimit.doubleValue() * 100) 
+                    : 0.0;
+                
+                map.put("executionRate", Math.round(executionRate));
+                map.put("remaining", remaining);
+                return map;
+            })
+            .collect(Collectors.toList());
 
         log.info("✅ 예산 초과 인원 리스트 조회 결과 - 총 {}명", dtoList.size());
         if (dtoList.isEmpty()) {
@@ -236,28 +236,5 @@ public class AccountingServiceImpl implements AccountingService {
         log.info("✅ 모든 통계 정보 통합 조회 완료");
         return result;
     }
-
-    // 한해찬 추가
-    @Override
-    public List<Map<String, Object>> getMonthlyExpenseTrend(String status) {
-        String statusValue = (status != null && !status.isEmpty())
-                ? status
-                : ApprovalStatus.APPROVED.name();
-
-        log.info("월별 지출 추이 조회 - status: {}", statusValue);
-
-        List<Object[]> results = expenseRepository.findMonthlyExpenseTrend(statusValue);
-
-        List<Map<String, Object>> trendList = results.stream()
-                .map(row -> {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("yearMonth", row[0] != null ? (String) row[0] : "");
-                    map.put("amount", ((Number) row[1]).longValue());
-                    return map;
-                })
-                .collect(Collectors.toList());
-
-        log.info("월별 지출 추이 조회 결과 - 총 {}개 월", trendList.size());
-        return trendList;
-    }
 }
+

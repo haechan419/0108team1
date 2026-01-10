@@ -1,78 +1,75 @@
 package com.Team1_Back.dto;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-@Getter
-@Setter
+@Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class PageResponseDTO<E> {
 
     private List<E> content;
 
     private int page;
-    private int size;
-    private long totalElements;
-    private int totalPages;
 
-    private boolean hasPrev;
-    private boolean hasNext;
+    private int size;
+
+    private Long totalElements;
+
+    private List<E> dtoList;
 
     private List<Integer> pageNumList;
-    private Integer prevPage;
-    private Integer nextPage;
+
+    private PageRequestDTO pageRequestDTO;
+
+    private boolean prev, next;
+
+    private Long totalCount;
+
+    private int prevPage, nextPage, totalPage, current;
 
     private List<String> departments;
 
-    public static <E> PageResponseDTO<E> of(
-            List<E> content,
-            PageRequestDTO request,
-            long totalCount
-    ) {
+    @Builder(builderMethodName = "withAll")
+    public PageResponseDTO(List<E> dtoList, PageRequestDTO pageRequestDTO, long totalCount) {
 
-        int page = request.getPage();
-        int size = request.getSize();
-        int totalPages = (int) Math.ceil(totalCount / (double) size);
+        this.dtoList = dtoList != null ? dtoList : List.of();
+        this.pageRequestDTO = pageRequestDTO != null ? pageRequestDTO : PageRequestDTO.builder().page(1).size(15).build();
+        this.totalCount =  totalCount;
 
-        int end = (int) (Math.ceil(page / 10.0)) * 10;
+        // 페이지 블록 계산 (10개씩) - mallapi 패턴
+        int end = (int) (Math.ceil(this.pageRequestDTO.getPage() / 10.0)) * 10;
         int start = end - 9;
-        end = Math.min(end, totalPages);
 
-        boolean hasPrev = start > 1;
-        boolean hasNext = totalCount > end * size;
+        int last = totalCount > 0 ? (int) (Math.ceil((totalCount / (double) this.pageRequestDTO.getSize()))) : 0;
 
-        List<Integer> pageNumList =
-                IntStream.rangeClosed(start, end).boxed().collect(Collectors.toList());
+        end = end > last ? last : end;
 
-        return PageResponseDTO.<E>builder()
-                .content(content)
-                .page(page)
-                .size(size)
-                .totalElements(totalCount)
-                .totalPages(totalPages)
-                .hasPrev(hasPrev)
-                .hasNext(hasNext)
-                .pageNumList(pageNumList)
-                .prevPage(hasPrev ? start - 1 : null)
-                .nextPage(hasNext ? end + 1 : null)
-                .build();
-    }
+        this.prev = start > 1;
 
-    /** Spring Data JPA Page<T> 기반 */
-    public static <E> PageResponseDTO<E> from(org.springframework.data.domain.Page<E> page) {
-        return PageResponseDTO.<E>builder()
-                .content(page.getContent())
-                .page(page.getNumber() + 1)
-                .size(page.getSize())
-                .totalElements(page.getTotalElements())
-                .totalPages(page.getTotalPages())
-                .hasPrev(page.hasPrevious())
-                .hasNext(page.hasNext())
-                .build();
+        // mallapi 패턴: totalCount > end * size로 다음 페이지 블록 존재 여부 확인
+        this.next = totalCount > end * this.pageRequestDTO.getSize();
+
+        this.pageNumList = IntStream.rangeClosed(start, end).boxed().collect(Collectors.toList());
+
+        if (prev) {
+            this.prevPage = start - 1;
+        }
+
+        if (next) {
+            this.nextPage = end + 1;
+        }
+
+        this.totalPage = this.pageNumList.size();
+
+        this.current = this.pageRequestDTO.getPage();
     }
 }
+

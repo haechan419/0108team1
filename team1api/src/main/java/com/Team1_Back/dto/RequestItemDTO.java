@@ -10,8 +10,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class RequestItemDTO {
-    private Long pno; // 상품 번호
-    private String pname; // 상품명
-    private int quantity; // 수량
-    private int price; // 단가
+    private Long pno;       // 상품 번호
+    private String pname;   // 상품명
+    private int quantity;   // 수량
+    private int price;      // 단가
 }

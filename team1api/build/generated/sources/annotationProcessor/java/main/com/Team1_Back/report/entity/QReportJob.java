@@ -19,10 +19,6 @@ public class QReportJob extends EntityPathBase<ReportJob> {
 
     public static final QReportJob reportJob = new QReportJob("reportJob");
 
-    public final NumberPath<Integer> approvedCount = createNumber("approvedCount", Integer.class);
-
-    public final NumberPath<Long> approvedTotal = createNumber("approvedTotal", Long.class);
-
     public final StringPath categoryJson = createString("categoryJson");
 
     public final DateTimePath<java.time.LocalDateTime> createdAt = createDateTime("createdAt", java.time.LocalDateTime.class);

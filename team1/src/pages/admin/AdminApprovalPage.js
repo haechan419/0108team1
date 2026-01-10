@@ -118,8 +118,9 @@ export default function AdminApprovalPage() {
             return (
               <div
                 key={reqId}
-                className={`history-card-pro ${expandedId === reqId ? "expanded" : ""
-                  }`}
+                className={`history-card-pro ${
+                  expandedId === reqId ? "expanded" : ""
+                }`}
                 // ✨ [핵심 수정] 여기에 스타일 적용 (왼쪽 띠 + 배경색)
                 style={{
                   borderLeft: `6px solid ${statusStyle.border}`,

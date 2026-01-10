@@ -131,8 +131,9 @@ export default function CartDrawer() {
       return;
     }
 
-    const msg = `총 ${finalTotal.toLocaleString()}원 (부가세 포함) 결재를 상신하시겠습니까?\n\n📝 사유: ${memo ? memo : "없음"
-      }`;
+    const msg = `총 ${finalTotal.toLocaleString()}원 (부가세 포함) 결재를 상신하시겠습니까?\n\n📝 사유: ${
+      memo ? memo : "없음"
+    }`;
 
     if (!window.confirm(msg)) {
       console.log("❌ 사용자가 취소함");
